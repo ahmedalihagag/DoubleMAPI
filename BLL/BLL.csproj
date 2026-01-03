@@ -21,7 +21,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DAL\DAL.csproj" />
-    <ProjectReference Include="..\DoubleMAPI\DoubleMAPI.csproj" />
   </ItemGroup>
 
 </Project>
