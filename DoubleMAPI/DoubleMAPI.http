@@ -1,0 +1,6 @@
+@DoubleMAPI_HostAddress = http://localhost:5137
+
+GET {{DoubleMAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
