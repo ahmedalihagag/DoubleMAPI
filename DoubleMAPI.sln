@@ -1,11 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36811.4 d17.14
+VisualStudioVersion = 17.14.36811.4
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DoubleMAPI", "DoubleMAPI\DoubleMAPI.csproj", "{9268F847-B29F-40C3-830E-9D02CF674085}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DAL", "DAL\DAL.csproj", "{548D43F5-FD75-4769-A526-C4C13C09C296}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BLL", "BLL\BLL.csproj", "{A961630F-F8E7-4BF7-BCD4-94F24CF229BE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{548D43F5-FD75-4769-A526-C4C13C09C296}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{548D43F5-FD75-4769-A526-C4C13C09C296}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{548D43F5-FD75-4769-A526-C4C13C09C296}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A961630F-F8E7-4BF7-BCD4-94F24CF229BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A961630F-F8E7-4BF7-BCD4-94F24CF229BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A961630F-F8E7-4BF7-BCD4-94F24CF229BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A961630F-F8E7-4BF7-BCD4-94F24CF229BE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
