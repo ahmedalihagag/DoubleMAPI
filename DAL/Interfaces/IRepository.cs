@@ -5,6 +5,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Text;
 using System.Threading.Tasks;
+using Serilog;
 
 namespace DAL.Interfaces
 {
@@ -40,5 +41,7 @@ namespace DAL.Interfaces
         // Query building
         IQueryable<T> Include(params Expression<Func<T, object>>[] includes);
         IQueryable<T> AsQueryable();
+        IQueryable<T> Query();
+
     }
 }

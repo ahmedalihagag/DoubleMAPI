@@ -1,6 +1,9 @@
 ﻿using DAL.Data;
 using DAL.Entities;
 using DAL.Interfaces;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Serilog;
 using System;
@@ -15,121 +18,83 @@ namespace DAL.Repositories
     {
         private readonly ApplicationDbContext _context;
         private readonly ILogger _logger;
-        private IDbContextTransaction? _transaction;
 
-        // Lazy-loaded repositories
-        private ICourseRepository? _courses;
-        private ICourseEnrollmentRepository? _courseEnrollments;
-        private IRepository<Section>? _sections;
-        private IRepository<Lesson>? _lessons;
-        private ILessonProgressRepository? _lessonProgresses;
-        private ICourseProgressRepository? _courseProgresses;
-        private IQuizRepository? _quizzes;
-        private IRepository<Question>? _questions;
-        private IRepository<Option>? _options;
-        private IQuizAttemptRepository? _quizAttempts;
-        private IRepository<StudentAnswer>? _studentAnswers;
-        private INotificationRepository? _notifications;
-        private IParentStudentRepository? _parentStudents;
-        private IRepository<ParentLinkCode>? _parentLinkCodes;
-        private IRepository<CourseCode>? _courseCodes;
-        private IRefreshTokenRepository? _refreshTokens;
-        private IBlacklistRepository? _blacklists;
-        private IEmailLogRepository? _emailLogs;
-        private IFileMetadataRepository? _fileMetadatas;
+        // Repositories
+        public ICourseRepository Courses { get; private set; }
+        public ICourseEnrollmentRepository CourseEnrollments { get; private set; }
+        public ISectionRepository Sections { get; private set; }
+        public ILessonRepository Lessons { get; private set; }
+        public ILessonProgressRepository LessonProgresses { get; private set; }
+        public ICourseProgressRepository CourseProgresses { get; private set; }
+        public IQuizRepository Quizzes { get; private set; }
+        public IQuestionRepository Questions { get; private set; }
+        public IOptionRepository Options { get; private set; }
+        public IQuizAttemptRepository QuizAttempts { get; private set; }
+        public IStudentAnswerRepository StudentAnswers { get; private set; }
+        public INotificationRepository Notifications { get; private set; }
+        public IParentStudentRepository ParentStudents { get; private set; }
+        public IParentLinkCodeRepository ParentLinkCodes { get; private set; }
+        public ICourseCodeRepository CourseCodes { get; private set; }
+        public IRefreshTokenRepository RefreshTokens { get; private set; }
+        public IBlacklistRepository Blacklists { get; private set; }
+        public IEmailLogRepository EmailLogs { get; private set; }
+        public IFileMetadataRepository FileMetadatas { get; private set; }
+        public ICourseAccessCodeRepository CourseAccessCodes { get; private set; }
+        public UserManager<ApplicationUser> UserManager { get; private set; }
+        public RoleManager<IdentityRole> RoleManager { get; private set; }
 
         public UnitOfWork(ApplicationDbContext context)
         {
-            _context = context;
+            _context = context ?? throw new ArgumentNullException(nameof(context));
             _logger = Log.ForContext<UnitOfWork>();
+
+            // Initialize repositories
+            Courses = new CourseRepository(_context);
+            CourseEnrollments = new CourseEnrollmentRepository(_context);
+            Sections = new SectionRepository(_context);
+            Lessons = new LessonRepository(_context);
+            LessonProgresses = new LessonProgressRepository(_context);
+            CourseProgresses = new CourseProgressRepository(_context);
+            Quizzes = new QuizRepository(_context);
+            Questions = new QuestionRepository(_context);
+            Options = new OptionRepository(_context);
+            QuizAttempts = new QuizAttemptRepository(_context);
+            StudentAnswers = new StudentAnswerRepository(_context);
+            Notifications = new NotificationRepository(_context);
+            ParentStudents = new ParentStudentRepository(_context);
+            ParentLinkCodes = new ParentLinkCodeRepository(_context);
+            CourseCodes = new CourseCodeRepository(_context);
+            RefreshTokens = new RefreshTokenRepository(_context);
+            Blacklists = new BlacklistRepository(_context);
+            EmailLogs = new EmailLogRepository(_context);
+            FileMetadatas = new FileMetadataRepository(_context);
+            CourseAccessCodes = new CourseAccessCodeRepository(_context);
+            UserManager = new UserManager<ApplicationUser>(
+                new UserStore<ApplicationUser>(_context),
+                null, // IOptions<IdentityOptions>
+                new PasswordHasher<ApplicationUser>(),
+                null, // IEnumerable<IUserValidator<ApplicationUser>>
+                null, // IEnumerable<IPasswordValidator<ApplicationUser>>
+                null, // ILookupNormalizer
+                null, // IdentityErrorDescriber
+                null, // IServiceProvider
+                null  // ILogger<UserManager<ApplicationUser>>
+            );
         }
 
-        // Repository Properties with Lazy Initialization
-        public ICourseRepository Courses =>
-            _courses ??= new CourseRepository(_context);
-
-        public ICourseEnrollmentRepository CourseEnrollments =>
-            _courseEnrollments ??= new CourseEnrollmentRepository(_context);
-
-        public IRepository<Section> Sections =>
-            _sections ??= new Repository<Section>(_context);
-
-        public IRepository<Lesson> Lessons =>
-            _lessons ??= new Repository<Lesson>(_context);
-
-        public ILessonProgressRepository LessonProgresses =>
-            _lessonProgresses ??= new LessonProgressRepository(_context);
-
-        public ICourseProgressRepository CourseProgresses =>
-            _courseProgresses ??= new CourseProgressRepository(_context);
-
-        public IQuizRepository Quizzes =>
-            _quizzes ??= new QuizRepository(_context);
-
-        public IRepository<Question> Questions =>
-            _questions ??= new Repository<Question>(_context);
-
-        public IRepository<Option> Options =>
-            _options ??= new Repository<Option>(_context);
-
-        public IQuizAttemptRepository QuizAttempts =>
-            _quizAttempts ??= new QuizAttemptRepository(_context);
-
-        public IRepository<StudentAnswer> StudentAnswers =>
-            _studentAnswers ??= new Repository<StudentAnswer>(_context);
-
-        public INotificationRepository Notifications =>
-            _notifications ??= new NotificationRepository(_context);
-
-        public IParentStudentRepository ParentStudents =>
-            _parentStudents ??= new ParentStudentRepository(_context);
-
-        public IRepository<ParentLinkCode> ParentLinkCodes =>
-            _parentLinkCodes ??= new Repository<ParentLinkCode>(_context);
-
-        public IRepository<CourseCode> CourseCodes =>
-            _courseCodes ??= new Repository<CourseCode>(_context);
-
-        public IRefreshTokenRepository RefreshTokens =>
-            _refreshTokens ??= new RefreshTokenRepository(_context);
-
-        public IBlacklistRepository Blacklists =>
-            _blacklists ??= new BlacklistRepository(_context);
-
-        public IEmailLogRepository EmailLogs =>
-            _emailLogs ??= new EmailLogRepository(_context);
-
-        public IFileMetadataRepository FileMetadatas =>
-            _fileMetadatas ??= new FileMetadataRepository(_context);
-
-        // Unit of Work Operations
-        public async Task<int> SaveChangesAsync()
-        {
-            try
-            {
-                _logger.Debug("Saving changes to database");
-                var result = await _context.SaveChangesAsync();
-                _logger.Information("Successfully saved {Count} changes to database", result);
-                return result;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error saving changes to database");
-                throw;
-            }
-        }
-
+        // --------------------
+        // TRANSACTIONS
+        // --------------------
         public async Task BeginTransactionAsync()
         {
             try
             {
-                _logger.Debug("Beginning database transaction");
-                _transaction = await _context.Database.BeginTransactionAsync();
-                _logger.Information("Database transaction started");
+                _logger.Debug("Beginning transaction");
+                await _context.Database.BeginTransactionAsync();
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error beginning database transaction");
+                _logger.Error(ex, "Error beginning transaction");
                 throw;
             }
         }
@@ -138,28 +103,13 @@ namespace DAL.Repositories
         {
             try
             {
-                _logger.Debug("Committing database transaction");
-                await _context.SaveChangesAsync();
-
-                if (_transaction != null)
-                {
-                    await _transaction.CommitAsync();
-                    _logger.Information("Database transaction committed successfully");
-                }
+                _logger.Debug("Committing transaction");
+                await _context.Database.CommitTransactionAsync();
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error committing database transaction");
-                await RollbackTransactionAsync();
+                _logger.Error(ex, "Error committing transaction");
                 throw;
-            }
-            finally
-            {
-                if (_transaction != null)
-                {
-                    await _transaction.DisposeAsync();
-                    _transaction = null;
-                }
             }
         }
 
@@ -167,27 +117,63 @@ namespace DAL.Repositories
         {
             try
             {
-                if (_transaction != null)
-                {
-                    _logger.Warning("Rolling back database transaction");
-                    await _transaction.RollbackAsync();
-                    await _transaction.DisposeAsync();
-                    _transaction = null;
-                    _logger.Information("Database transaction rolled back");
-                }
+                _logger.Debug("Rolling back transaction");
+                await _context.Database.RollbackTransactionAsync();
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error rolling back database transaction");
+                _logger.Error(ex, "Error rolling back transaction");
                 throw;
+            }
+        }
+
+        // --------------------
+        // SAVE
+        // --------------------
+        public async Task<int> SaveChangesAsync()
+        {
+            try
+            {
+                _logger.Debug("Saving changes to database");
+                return await _context.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error saving changes to database");
+                throw;
+            }
+        }
+
+        public async Task AddRefreshTokenAsync(RefreshToken token)
+        {
+            await _context.RefreshTokens.AddAsync(token);
+        }
+
+        public async Task<RefreshToken?> GetRefreshTokenAsync(string tokenHash)
+        {
+            return await _context.RefreshTokens.FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
+        }
+
+        // --------------------
+        // DISPOSE
+        // --------------------
+        private bool _disposed = false;
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _context.Dispose();
+                }
+                _disposed = true;
             }
         }
 
         public void Dispose()
         {
-            _logger.Debug("Disposing UnitOfWork");
-            _transaction?.Dispose();
-            _context.Dispose();
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
     }
 }

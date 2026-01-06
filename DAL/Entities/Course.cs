@@ -52,5 +52,7 @@ namespace DAL.Entities
         public virtual ICollection<CourseCode> CourseCodes { get; set; } = new List<CourseCode>();
         public virtual ICollection<CourseProgress> CourseProgresses { get; set; } = new List<CourseProgress>();
         public virtual ICollection<Quiz> Quizzes { get; set; } = new List<Quiz>();
+
+        public ICollection<CourseAccessCode> AccessCodes { get; set; } = new List<CourseAccessCode>();
     }
 }

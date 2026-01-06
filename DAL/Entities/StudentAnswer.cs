@@ -19,11 +19,17 @@ namespace DAL.Entities
         public int QuestionId { get; set; }
         public virtual Question Question { get; set; }
 
+        public bool IsDeleted { get; set; } = false;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
+
         [Required]
         public int SelectedOptionId { get; set; }
 
         public bool IsCorrect { get; set; }
 
         public decimal PointsEarned { get; set; }
-     }
+        public virtual Option? SelectedOption { get; set; }
+
+    }
 }

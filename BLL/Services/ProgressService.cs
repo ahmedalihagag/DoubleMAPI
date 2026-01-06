@@ -4,6 +4,7 @@ using BLL.Interfaces;
 using DAL.Entities;
 using DAL.Interfaces;
 using Microsoft.Extensions.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,7 +17,7 @@ namespace BLL.Services
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
-        private readonly ILogger _logger;
+        private readonly Serilog.ILogger _logger;
 
         public ProgressService(IUnitOfWork unitOfWork, IMapper mapper)
         {
@@ -61,8 +62,10 @@ namespace BLL.Services
                 var section = await _unitOfWork.Sections.GetByIdAsync(lesson.SectionId);
                 if (section != null)
                 {
+                    // section may be a tuple (int Id, int CourseId, string Title, int DisplayOrder)?
+                    // If so, access CourseId via section.Value.CourseId
                     await _unitOfWork.CourseProgresses
-                        .UpdateCompletionPercentageAsync(studentId, section.CourseId);
+                        .UpdateCompletionPercentageAsync(studentId, section.Value.CourseId);
                 }
 
                 await _unitOfWork.CommitTransactionAsync();

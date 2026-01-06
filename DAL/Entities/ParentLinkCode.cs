@@ -24,5 +24,11 @@ namespace DAL.Entities
         public bool IsUsed { get; set; } = false;
 
         public DateTime? UsedAt { get; set; }
+
+        public DateTime? UpdatedAt { get; set; }
+
+        public bool IsDeleted { get; set; } = false; // Optional, for soft delete
+
+
     }
 }

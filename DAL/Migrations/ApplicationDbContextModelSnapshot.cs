@@ -254,6 +254,51 @@ namespace DAL.Migrations
                     b.ToTable("Courses");
                 });
 
+            modelBuilder.Entity("DAL.Entities.CourseAccessCode", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<int>("CourseId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("DisabledAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDisabled")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsUsed")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("UsedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId");
+
+                    b.ToTable("CourseAccessCodes");
+                });
+
             modelBuilder.Entity("DAL.Entities.CourseCode", b =>
                 {
                     b.Property<string>("Code")
@@ -271,6 +316,12 @@ namespace DAL.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsUsed")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -279,6 +330,9 @@ namespace DAL.Migrations
                     b.Property<string>("IssuedBy")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("UsedAt")
                         .HasColumnType("datetime2");
@@ -645,6 +699,9 @@ namespace DAL.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("int");
 
@@ -653,6 +710,9 @@ namespace DAL.Migrations
                         .HasColumnType("bit")
                         .HasDefaultValue(false);
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<int>("QuestionId")
                         .HasColumnType("int");
 
@@ -660,6 +720,9 @@ namespace DAL.Migrations
                         .IsRequired()
                         .HasMaxLength(1000)
                         .HasColumnType("nvarchar(1000)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
@@ -682,6 +745,9 @@ namespace DAL.Migrations
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<bool>("IsUsed")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("bit")
@@ -690,6 +756,9 @@ namespace DAL.Migrations
                     b.Property<string>("StudentId")
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<DateTime?>("UsedAt")
                         .HasColumnType("datetime2");
@@ -751,6 +820,9 @@ namespace DAL.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<string>("DifficultyLevel")
                         .HasMaxLength(50)
                         .HasColumnType("nvarchar(50)");
@@ -761,6 +833,9 @@ namespace DAL.Migrations
                     b.Property<string>("Explanation")
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
 
                     b.Property<decimal>("Points")
                         .ValueGeneratedOnAdd()
@@ -782,6 +857,9 @@ namespace DAL.Migrations
                         .IsRequired()
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
@@ -915,6 +993,9 @@ namespace DAL.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<int>("ClientType")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
@@ -939,6 +1020,9 @@ namespace DAL.Migrations
                     b.Property<DateTime?>("LastUsedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<int?>("ReplacedByTokenId")
+                        .HasColumnType("int");
+
                     b.Property<DateTime?>("RevokedAt")
                         .HasColumnType("datetime2");
 
@@ -956,6 +1040,8 @@ namespace DAL.Migrations
                     b.HasIndex("ExpiresAt");
 
                     b.HasIndex("IsRevoked");
+
+                    b.HasIndex("ReplacedByTokenId");
 
                     b.HasIndex("TokenHash")
                         .IsUnique();
@@ -984,6 +1070,9 @@ namespace DAL.Migrations
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1007,8 +1096,17 @@ namespace DAL.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
                     b.Property<bool>("IsCorrect")
                         .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("OptionId")
+                        .HasColumnType("int");
 
                     b.Property<decimal>("PointsEarned")
                         .HasPrecision(5, 2)
@@ -1023,9 +1121,16 @@ namespace DAL.Migrations
                     b.Property<int>("SelectedOptionId")
                         .HasColumnType("int");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
+                    b.HasIndex("OptionId");
+
                     b.HasIndex("QuestionId");
+
+                    b.HasIndex("SelectedOptionId");
 
                     b.HasIndex("QuizAttemptId", "QuestionId");
 
@@ -1193,6 +1298,17 @@ namespace DAL.Migrations
                         .IsRequired();
 
                     b.Navigation("Teacher");
+                });
+
+            modelBuilder.Entity("DAL.Entities.CourseAccessCode", b =>
+                {
+                    b.HasOne("DAL.Entities.Course", "Course")
+                        .WithMany("AccessCodes")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Course");
                 });
 
             modelBuilder.Entity("DAL.Entities.CourseCode", b =>
@@ -1388,11 +1504,17 @@ namespace DAL.Migrations
 
             modelBuilder.Entity("DAL.Entities.RefreshToken", b =>
                 {
+                    b.HasOne("DAL.Entities.RefreshToken", "ReplacedByToken")
+                        .WithMany()
+                        .HasForeignKey("ReplacedByTokenId");
+
                     b.HasOne("DAL.Entities.ApplicationUser", "User")
                         .WithMany("RefreshTokens")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("ReplacedByToken");
 
                     b.Navigation("User");
                 });
@@ -1410,6 +1532,10 @@ namespace DAL.Migrations
 
             modelBuilder.Entity("DAL.Entities.StudentAnswer", b =>
                 {
+                    b.HasOne("DAL.Entities.Option", null)
+                        .WithMany("StudentAnswers")
+                        .HasForeignKey("OptionId");
+
                     b.HasOne("DAL.Entities.Question", "Question")
                         .WithMany("StudentAnswers")
                         .HasForeignKey("QuestionId")
@@ -1422,9 +1548,17 @@ namespace DAL.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("DAL.Entities.Option", "SelectedOption")
+                        .WithMany()
+                        .HasForeignKey("SelectedOptionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Question");
 
                     b.Navigation("QuizAttempt");
+
+                    b.Navigation("SelectedOption");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>", b =>
@@ -1507,6 +1641,8 @@ namespace DAL.Migrations
 
             modelBuilder.Entity("DAL.Entities.Course", b =>
                 {
+                    b.Navigation("AccessCodes");
+
                     b.Navigation("CourseCodes");
 
                     b.Navigation("CourseProgresses");
@@ -1521,6 +1657,11 @@ namespace DAL.Migrations
             modelBuilder.Entity("DAL.Entities.Lesson", b =>
                 {
                     b.Navigation("LessonProgresses");
+                });
+
+            modelBuilder.Entity("DAL.Entities.Option", b =>
+                {
+                    b.Navigation("StudentAnswers");
                 });
 
             modelBuilder.Entity("DAL.Entities.Question", b =>

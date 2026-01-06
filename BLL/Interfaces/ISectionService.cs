@@ -9,9 +9,10 @@ namespace BLL.Interfaces
 {
     public interface ISectionService
     {
-        Task<SectionDto> CreateSectionAsync(CreateSectionDto createSectionDto);
-        Task<SectionDto?> GetSectionByIdAsync(int sectionId);
-        Task<bool> UpdateSectionAsync(int sectionId, CreateSectionDto updateDto);
-        Task<bool> DeleteSectionAsync(int sectionId);
+        Task<SectionDto> CreateAsync(CreateSectionDto dto);
+        Task<bool> UpdateAsync(int sectionId, CreateSectionDto dto);
+        Task<bool> DeleteAsync(int sectionId);
+        Task<SectionDto?> GetByIdAsync(int sectionId);
+        Task<IEnumerable<SectionDto>> GetAllByCourseIdAsync(int courseId);
     }
 }

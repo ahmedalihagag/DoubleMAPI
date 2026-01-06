@@ -17,18 +17,27 @@ namespace DAL.Fluent_API
 
             builder.Property(sa => sa.PointsEarned).HasPrecision(5, 2);
 
+            // QuizAttempt relationship (cascade allowed)
             builder.HasOne(sa => sa.QuizAttempt)
-                .WithMany(qa => qa.StudentAnswers)
-                .HasForeignKey(sa => sa.QuizAttemptId)
-                .OnDelete(DeleteBehavior.Cascade);
+                   .WithMany(qa => qa.StudentAnswers)
+                   .HasForeignKey(sa => sa.QuizAttemptId)
+                   .OnDelete(DeleteBehavior.Cascade);
 
+            // Question relationship (restrict)
             builder.HasOne(sa => sa.Question)
-                .WithMany(q => q.StudentAnswers)
-                .HasForeignKey(sa => sa.QuestionId)
-                .OnDelete(DeleteBehavior.Restrict);
+                   .WithMany(q => q.StudentAnswers)
+                   .HasForeignKey(sa => sa.QuestionId)
+                   .OnDelete(DeleteBehavior.Restrict);
+
+            // SelectedOption relationship (restrict to avoid multiple cascade paths)
+            builder.HasOne(sa => sa.SelectedOption)
+                   .WithMany() // no back-reference needed
+                   .HasForeignKey(sa => sa.SelectedOptionId)
+                   .OnDelete(DeleteBehavior.Restrict);
 
             builder.HasIndex(sa => new { sa.QuizAttemptId, sa.QuestionId });
             builder.HasIndex(sa => sa.QuestionId);
         }
     }
 }
+

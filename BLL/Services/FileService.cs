@@ -1,7 +1,10 @@
 ﻿using BLL.DTOs;
+using BLL.Interfaces;
 using DAL.Entities;
 using DAL.Interfaces;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,10 +16,10 @@ namespace BLL.Services
     public class FileService : IFileService
     {
         private readonly IUnitOfWork _unitOfWork;
-        private readonly IBunnyService _bunnyService;
-        private readonly ILogger _logger;
+        private readonly IMediaService _bunnyService;
+        private readonly Serilog.ILogger _logger;
 
-        public FileService(IUnitOfWork unitOfWork, IBunnyService bunnyService)
+        public FileService(IUnitOfWork unitOfWork, IMediaService bunnyService)
         {
             _unitOfWork = unitOfWork;
             _bunnyService = bunnyService;
@@ -29,14 +32,14 @@ namespace BLL.Services
             {
                 _logger.Information("Uploading video: {FileName} by user: {UserId}", fileName, uploadedBy);
 
-                var cdnUrl = await _bunnyService.UploadVideoAsync(fileStream, fileName);
+                var cdnUrl = await _bunnyService.UploadVideoAsync(fileStream, fileName,uploadedBy);
 
                 var fileMetadata = new FileMetadata
                 {
                     FileName = fileName,
                     FileType = "Video",
                     FileSize = fileStream.Length,
-                    BunnyCdnUrl = cdnUrl,
+                    BunnyCdnUrl = cdnUrl.Url,
                     UploadedBy = uploadedBy,
                     UploadedAt = DateTime.UtcNow
                 };
@@ -51,7 +54,7 @@ namespace BLL.Services
                     FileName = fileName,
                     FileType = "Video",
                     FileSize = fileStream.Length,
-                    Url = cdnUrl
+                    Url = cdnUrl.Url
                 };
             }
             catch (Exception ex)
@@ -67,14 +70,14 @@ namespace BLL.Services
             {
                 _logger.Information("Uploading image: {FileName} by user: {UserId}", fileName, uploadedBy);
 
-                var cdnUrl = await _bunnyService.UploadImageAsync(fileStream, fileName);
+                var cdnUrl = await _bunnyService.UploadImageAsync(fileStream, fileName, uploadedBy);
 
                 var fileMetadata = new FileMetadata
                 {
                     FileName = fileName,
                     FileType = "Image",
                     FileSize = fileStream.Length,
-                    BunnyCdnUrl = cdnUrl,
+                    BunnyCdnUrl = cdnUrl.Url,
                     UploadedBy = uploadedBy,
                     UploadedAt = DateTime.UtcNow
                 };
@@ -89,7 +92,7 @@ namespace BLL.Services
                     FileName = fileName,
                     FileType = "Image",
                     FileSize = fileStream.Length,
-                    Url = cdnUrl
+                    Url = cdnUrl.Url
                 };
             }
             catch (Exception ex)
@@ -99,13 +102,13 @@ namespace BLL.Services
             }
         }
 
-        public async Task<FileUploadDto> UploadPdfAsync(Stream fileStream, string fileName, string uploadedBy)
+        public async Task<FileUploadDto> UploadPdfAsync(IFormFile fileStream, string fileName, string uploadedBy)
         {
             try
             {
                 _logger.Information("Uploading PDF: {FileName} by user: {UserId}", fileName, uploadedBy);
 
-                var cdnUrl = await _bunnyService.UploadPdfAsync(fileStream, fileName);
+                var cdnUrl = await _bunnyService.UploadFileAsync(fileStream, fileName);
 
                 var fileMetadata = new FileMetadata
                 {

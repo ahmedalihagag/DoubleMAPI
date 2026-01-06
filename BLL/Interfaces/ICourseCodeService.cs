@@ -1,4 +1,7 @@
-﻿using System;
+﻿using BLL.DTOs.CourseDTOs;
+using DAL.Entities;
+using DAL.Interfaces;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,9 +11,12 @@ namespace BLL.Interfaces
 {
     public interface ICourseCodeService
     {
-        Task<string> GenerateCourseCodeAsync(int courseId, string adminId, int expiryDays = 30);
-        Task<List<CourseCodeDto>> GetCourseCodesAsync(int courseId);
-        Task<bool> ValidateCourseCodeAsync(string code);
-        Task<bool> RevokeCourseCodeAsync(string code, string adminId);
+        Task<CourseCodeDto> GenerateCodeAsync(CreateCourseCodeDto dto);
+        Task<bool> DisableCodeAsync(string code);
+        Task<bool> EnableCodeAsync(string code);
+        Task<bool> UseCodeAsync(string code, string studentId);
+        Task<CourseCodeDto?> GetByCodeAsync(string code);
+        Task<IEnumerable<CourseCodeDto>> GetActiveCodesByCourseAsync(int courseId);
+        Task<bool> UpdateCodeAsync(string code, UpdateCourseCodeDto dto);
     }
 }

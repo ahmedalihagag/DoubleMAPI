@@ -28,7 +28,7 @@ namespace BLL.Mappings
             CreateMap<ApplicationUser, UserDto>()
                 .ForMember(dest => dest.Roles, opt => opt.Ignore()); // Populated manually
 
-            CreateMap<RegisterDto, ApplicationUser>()
+            CreateMap<RegisterUserDto, ApplicationUser>()
                 .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.Email))
                 .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow));
 
@@ -58,12 +58,14 @@ namespace BLL.Mappings
                 .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
                 .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
 
-            // Section Mappings
-            CreateMap<Section, SectionDto>()
-                .ForMember(dest => dest.Lessons, opt => opt.MapFrom(src => src.Lessons));
+            CreateMap<CourseCode, CourseCodeDto>().ReverseMap();
+            CreateMap<CreateCourseCodeDto, CourseCode>();
+            CreateMap<UpdateCourseCodeDto, CourseCode>()
+                .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
 
-            CreateMap<CreateSectionDto, Section>()
-                .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow));
+            // Section Mappings
+            CreateMap<Section, SectionDto>();
+            CreateMap<CreateSectionDto, Section>(); 
 
             // Lesson Mappings
             CreateMap<Lesson, LessonDto>()

@@ -1,4 +1,5 @@
 ﻿using DAL.Entities;
+using Microsoft.AspNetCore.Identity;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,28 +13,38 @@ namespace DAL.Interfaces
         // Repositories
         ICourseRepository Courses { get; }
         ICourseEnrollmentRepository CourseEnrollments { get; }
-        IRepository<Section> Sections { get; }
-        IRepository<Lesson> Lessons { get; }
+        ISectionRepository Sections { get; }
+        ILessonRepository Lessons { get; }
         ILessonProgressRepository LessonProgresses { get; }
         ICourseProgressRepository CourseProgresses { get; }
         IQuizRepository Quizzes { get; }
-        IRepository<Question> Questions { get; }
-        IRepository<Option> Options { get; }
+        IQuestionRepository Questions { get; }
+        IOptionRepository Options { get; }
         IQuizAttemptRepository QuizAttempts { get; }
-        IRepository<StudentAnswer> StudentAnswers { get; }
+        IStudentAnswerRepository StudentAnswers { get; }
         INotificationRepository Notifications { get; }
         IParentStudentRepository ParentStudents { get; }
-        IRepository<ParentLinkCode> ParentLinkCodes { get; }
-        IRepository<CourseCode> CourseCodes { get; }
+        IParentLinkCodeRepository ParentLinkCodes { get; }
+        ICourseCodeRepository CourseCodes { get; }
         IRefreshTokenRepository RefreshTokens { get; }
         IBlacklistRepository Blacklists { get; }
         IEmailLogRepository EmailLogs { get; }
         IFileMetadataRepository FileMetadatas { get; }
+        ICourseAccessCodeRepository CourseAccessCodes { get; }
+
+
+        
+        //Identity Related
+        UserManager<ApplicationUser> UserManager { get; }
+        RoleManager<IdentityRole> RoleManager { get; }
 
         // Unit of Work operations
         Task<int> SaveChangesAsync();
         Task BeginTransactionAsync();
         Task CommitTransactionAsync();
         Task RollbackTransactionAsync();
+        Task AddRefreshTokenAsync(RefreshToken token);
+        Task<RefreshToken?> GetRefreshTokenAsync(string tokenHash);
+
     }
 }

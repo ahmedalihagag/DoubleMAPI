@@ -22,10 +22,13 @@ namespace DAL.Repositories
         public Repository(ApplicationDbContext context)
         {
             _context = context ?? throw new ArgumentNullException(nameof(context));
-            _dbSet = context.Set<T>();
+            _dbSet = _context.Set<T>();
             _logger = Log.ForContext<Repository<T>>();
         }
 
+        // --------------------
+        // GET
+        // --------------------
         public virtual async Task<T?> GetByIdAsync(int id)
         {
             try
@@ -59,7 +62,7 @@ namespace DAL.Repositories
             try
             {
                 _logger.Debug("Getting all {EntityType}", typeof(T).Name);
-                return await _dbSet.ToListAsync();
+                return await _dbSet.AsNoTracking().ToListAsync();
             }
             catch (Exception ex)
             {
@@ -73,7 +76,7 @@ namespace DAL.Repositories
             try
             {
                 _logger.Debug("Finding {EntityType} with predicate", typeof(T).Name);
-                return await _dbSet.FirstOrDefaultAsync(predicate);
+                return await _dbSet.AsNoTracking().FirstOrDefaultAsync(predicate);
             }
             catch (Exception ex)
             {
@@ -87,7 +90,7 @@ namespace DAL.Repositories
             try
             {
                 _logger.Debug("Finding all {EntityType} with predicate", typeof(T).Name);
-                return await _dbSet.Where(predicate).ToListAsync();
+                return await _dbSet.AsNoTracking().Where(predicate).ToListAsync();
             }
             catch (Exception ex)
             {
@@ -96,22 +99,36 @@ namespace DAL.Repositories
             }
         }
 
+        // --------------------
+        // PAGINATION
+        // --------------------
         public virtual async Task<PagedResult<T>> GetPagedAsync(PaginationParams paginationParams)
         {
-            if (paginationParams is null)
-                throw new ArgumentNullException(nameof(paginationParams));
+            return await GetPagedAsync(paginationParams, null);
+        }
+
+        public virtual async Task<PagedResult<T>> GetPagedAsync(
+            PaginationParams paginationParams,
+            Expression<Func<T, bool>>? filter = null,
+            params Expression<Func<T, object>>[] includes)
+        {
+            if (paginationParams == null) throw new ArgumentNullException(nameof(paginationParams));
 
             try
             {
-                _logger.Debug("Getting paged {EntityType} - Page: {Page}, Size: {Size}",
-                    typeof(T).Name, paginationParams.PageNumber, paginationParams.PageSize);
+                IQueryable<T> query = _dbSet.AsNoTracking();
 
-                var query = _dbSet.AsQueryable();
+                if (includes != null && includes.Length > 0)
+                {
+                    foreach (var include in includes)
+                        query = query.Include(include);
+                }
+
+                if (filter != null)
+                    query = query.Where(filter);
 
                 if (!string.IsNullOrWhiteSpace(paginationParams.SortBy))
-                {
                     query = ApplyOrdering(query, paginationParams.SortBy, paginationParams.SortDescending);
-                }
 
                 var totalCount = await query.CountAsync();
 
@@ -138,232 +155,62 @@ namespace DAL.Repositories
             }
         }
 
-        public virtual async Task<PagedResult<T>> GetPagedAsync(
-            PaginationParams paginationParams,
-            Expression<Func<T, bool>>? filter = null,
-            params Expression<Func<T, object>>[] includes)
-        {
-            if (paginationParams is null)
-                throw new ArgumentNullException(nameof(paginationParams));
+        // --------------------
+        // COUNT & EXISTS
+        // --------------------
+        public virtual async Task<int> CountAsync() => await _dbSet.CountAsync();
+        public virtual async Task<int> CountAsync(Expression<Func<T, bool>> predicate) => await _dbSet.CountAsync(predicate);
+        public virtual async Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate) => await _dbSet.AnyAsync(predicate);
 
-            try
-            {
-                _logger.Debug("Getting filtered paged {EntityType} - Page: {Page}, Size: {Size}, Includes: {IncludeCount}",
-                    typeof(T).Name, paginationParams.PageNumber, paginationParams.PageSize, includes?.Length ?? 0);
+        // --------------------
+        // MODIFICATIONS
+        // --------------------
+        public virtual async Task AddAsync(T entity) => await _dbSet.AddAsync(entity);
+        public virtual async Task AddRangeAsync(IEnumerable<T> entities) => await _dbSet.AddRangeAsync(entities);
 
-                IQueryable<T> query = _dbSet;
+        public virtual void Update(T entity) => _dbSet.Update(entity);
+        public virtual void UpdateRange(IEnumerable<T> entities) => _dbSet.UpdateRange(entities);
 
-                if (includes != null && includes.Length > 0)
-                {
-                    foreach (var include in includes)
-                    {
-                        query = query.Include(include);
-                    }
-                }
+        public virtual void Delete(T entity) => _dbSet.Remove(entity);
+        public virtual void DeleteRange(IEnumerable<T> entities) => _dbSet.RemoveRange(entities);
 
-                if (filter != null)
-                {
-                    query = query.Where(filter);
-                }
-
-                if (!string.IsNullOrWhiteSpace(paginationParams.SortBy))
-                {
-                    query = ApplyOrdering(query, paginationParams.SortBy, paginationParams.SortDescending);
-                }
-
-                var totalCount = await query.CountAsync();
-
-                var items = await query
-                    .Skip((paginationParams.PageNumber - 1) * paginationParams.PageSize)
-                    .Take(paginationParams.PageSize)
-                    .ToListAsync();
-
-                var metadata = new PaginationMetadata(
-                    paginationParams.PageNumber,
-                    paginationParams.PageSize,
-                    totalCount
-                );
-
-                _logger.Information("Retrieved {Count} filtered {EntityType} items (Page {Page}/{TotalPages})",
-                    items.Count, typeof(T).Name, metadata.CurrentPage, metadata.TotalPages);
-
-                return new PagedResult<T>(items, metadata);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error getting filtered paged {EntityType}", typeof(T).Name);
-                throw;
-            }
-        }
-
-        public virtual async Task<int> CountAsync()
-        {
-            try
-            {
-                return await _dbSet.CountAsync();
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error counting {EntityType}", typeof(T).Name);
-                throw;
-            }
-        }
-
-        public virtual async Task<int> CountAsync(Expression<Func<T, bool>> predicate)
-        {
-            try
-            {
-                return await _dbSet.CountAsync(predicate);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error counting {EntityType} with predicate", typeof(T).Name);
-                throw;
-            }
-        }
-
-        public virtual async Task<bool> ExistsAsync(Expression<Func<T, bool>> predicate)
-        {
-            try
-            {
-                return await _dbSet.AnyAsync(predicate);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error checking existence of {EntityType}", typeof(T).Name);
-                throw;
-            }
-        }
-
-        public virtual async Task AddAsync(T entity)
-        {
-            try
-            {
-                _logger.Debug("Adding {EntityType}", typeof(T).Name);
-                await _dbSet.AddAsync(entity);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error adding {EntityType}", typeof(T).Name);
-                throw;
-            }
-        }
-
-        public virtual async Task AddRangeAsync(IEnumerable<T> entities)
-        {
-            try
-            {
-                _logger.Debug("Adding {Count} {EntityType} entities", entities?.Count() ?? 0, typeof(T).Name);
-                await _dbSet.AddRangeAsync(entities);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error adding range of {EntityType}", typeof(T).Name);
-                throw;
-            }
-        }
-
-        public virtual void Update(T entity)
-        {
-            try
-            {
-                _logger.Debug("Updating {EntityType}", typeof(T).Name);
-                _dbSet.Update(entity);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error updating {EntityType}", typeof(T).Name);
-                throw;
-            }
-        }
-
-        public virtual void UpdateRange(IEnumerable<T> entities)
-        {
-            try
-            {
-                _logger.Debug("Updating {Count} {EntityType} entities", entities?.Count() ?? 0, typeof(T).Name);
-                _dbSet.UpdateRange(entities);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error updating range of {EntityType}", typeof(T).Name);
-                throw;
-            }
-        }
-
-        public virtual void Delete(T entity)
-        {
-            try
-            {
-                _logger.Debug("Deleting {EntityType}", typeof(T).Name);
-                _dbSet.Remove(entity);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error deleting {EntityType}", typeof(T).Name);
-                throw;
-            }
-        }
-
-        public virtual void DeleteRange(IEnumerable<T> entities)
-        {
-            try
-            {
-                _logger.Debug("Deleting {Count} {EntityType} entities", entities?.Count() ?? 0, typeof(T).Name);
-                _dbSet.RemoveRange(entities);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error deleting range of {EntityType}", typeof(T).Name);
-                throw;
-            }
-        }
-
+        // --------------------
+        // QUERY BUILDING
+        // --------------------
         public virtual IQueryable<T> Include(params Expression<Func<T, object>>[] includes)
         {
             IQueryable<T> query = _dbSet;
-
             foreach (var include in includes)
-            {
                 query = query.Include(include);
-            }
-
             return query;
         }
 
-        public virtual IQueryable<T> AsQueryable()
-        {
-            return _dbSet.AsQueryable();
-        }
+        public virtual IQueryable<T> Query() => _dbSet.AsNoTracking();
+        public virtual IQueryable<T> AsQueryable() => _dbSet.AsQueryable();
 
-        // Helper: apply ordering by property name (supports nested properties like "Parent.Name")
+        // --------------------
+        // HELPER: ORDERING
+        // --------------------
         private static IQueryable<T> ApplyOrdering(IQueryable<T> query, string sortBy, bool descending)
         {
-            if (string.IsNullOrWhiteSpace(sortBy))
-                return query;
+            if (string.IsNullOrWhiteSpace(sortBy)) return query;
 
-            // build expression: x => x.Prop1.Prop2
             var parameter = Expression.Parameter(typeof(T), "x");
             Expression propertyAccess = parameter;
 
             foreach (var member in sortBy.Split('.'))
-            {
                 propertyAccess = Expression.PropertyOrField(propertyAccess, member);
-            }
 
             var propertyType = propertyAccess.Type;
             var lambda = Expression.Lambda(propertyAccess, parameter);
 
             var methodName = descending ? "OrderByDescending" : "OrderBy";
 
-            var queryableType = typeof(Queryable);
-            var method = queryableType.GetMethods(BindingFlags.Public | BindingFlags.Static)
-                .Where(m => m.Name == methodName && m.GetParameters().Length == 2)
-                .Single()
+            var method = typeof(Queryable).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .First(m => m.Name == methodName && m.GetParameters().Length == 2)
                 .MakeGenericMethod(typeof(T), propertyType);
 
-            var orderedQuery = (IQueryable<T>)method.Invoke(null, new object[] { query, lambda })!;
-            return orderedQuery;
+            return (IQueryable<T>)method.Invoke(null, new object[] { query, lambda })!;
         }
     }
 }

@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace DAL.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class Init : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -223,7 +223,9 @@ namespace DAL.Migrations
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
                     ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     IsUsed = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
-                    UsedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    UsedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -273,16 +275,23 @@ namespace DAL.Migrations
                     UserId = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     TokenHash = table.Column<string>(type: "nvarchar(500)", maxLength: 500, nullable: false),
                     DeviceInfo = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: true),
+                    ClientType = table.Column<int>(type: "int", nullable: false),
                     IpAddress = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
                     ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     LastUsedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     IsRevoked = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
-                    RevokedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                    RevokedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    ReplacedByTokenId = table.Column<int>(type: "int", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_RefreshTokens", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_RefreshTokens_RefreshTokens_ReplacedByTokenId",
+                        column: x => x.ReplacedByTokenId,
+                        principalTable: "RefreshTokens",
+                        principalColumn: "Id");
                     table.ForeignKey(
                         name: "FK_RefreshTokens_Users_UserId",
                         column: x => x.UserId,
@@ -377,17 +386,47 @@ namespace DAL.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "CourseAccessCodes",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Code = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
+                    CourseId = table.Column<int>(type: "int", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UsedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    CreatedBy = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    IsUsed = table.Column<bool>(type: "bit", nullable: false),
+                    IsDisabled = table.Column<bool>(type: "bit", nullable: false),
+                    DisabledAt = table.Column<DateTime>(type: "datetime2", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_CourseAccessCodes", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_CourseAccessCodes_Courses_CourseId",
+                        column: x => x.CourseId,
+                        principalTable: "Courses",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "CourseCodes",
                 columns: table => new
                 {
                     Code = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     CourseId = table.Column<int>(type: "int", nullable: false),
+                    IssuedBy = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
                     ExpiresAt = table.Column<DateTime>(type: "datetime2", nullable: false),
-                    IssuedBy = table.Column<string>(type: "nvarchar(450)", nullable: false),
                     IsUsed = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
                     UsedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
-                    UsedBy = table.Column<string>(type: "nvarchar(max)", nullable: true)
+                    UsedBy = table.Column<string>(type: "nvarchar(max)", nullable: true),
+                    IsActive = table.Column<bool>(type: "bit", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -502,6 +541,7 @@ namespace DAL.Migrations
                         .Annotation("SqlServer:Identity", "1, 1"),
                     CourseId = table.Column<int>(type: "int", nullable: false),
                     Title = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
                     DisplayOrder = table.Column<int>(type: "int", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false, defaultValueSql: "GETUTCDATE()"),
                     UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true)
@@ -527,6 +567,9 @@ namespace DAL.Migrations
                     Text = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: false),
                     QuestionType = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false, defaultValue: "MultipleChoice"),
                     Points = table.Column<decimal>(type: "decimal(5,2)", precision: 5, scale: 2, nullable: false, defaultValue: 1m),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     DisplayOrder = table.Column<int>(type: "int", nullable: false),
                     DifficultyLevel = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: true),
                     Explanation = table.Column<string>(type: "nvarchar(2000)", maxLength: 2000, nullable: true)
@@ -612,6 +655,9 @@ namespace DAL.Migrations
                     QuestionId = table.Column<int>(type: "int", nullable: false),
                     Text = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
                     IsCorrect = table.Column<bool>(type: "bit", nullable: false, defaultValue: false),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
                     DisplayOrder = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
@@ -621,35 +667,6 @@ namespace DAL.Migrations
                         name: "FK_Options_Questions_QuestionId",
                         column: x => x.QuestionId,
                         principalTable: "Questions",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Cascade);
-                });
-
-            migrationBuilder.CreateTable(
-                name: "StudentAnswers",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
-                    QuizAttemptId = table.Column<int>(type: "int", nullable: false),
-                    QuestionId = table.Column<int>(type: "int", nullable: false),
-                    SelectedOptionId = table.Column<int>(type: "int", nullable: false),
-                    IsCorrect = table.Column<bool>(type: "bit", nullable: false),
-                    PointsEarned = table.Column<decimal>(type: "decimal(5,2)", precision: 5, scale: 2, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_StudentAnswers", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_StudentAnswers_Questions_QuestionId",
-                        column: x => x.QuestionId,
-                        principalTable: "Questions",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                    table.ForeignKey(
-                        name: "FK_StudentAnswers_QuizAttempts_QuizAttemptId",
-                        column: x => x.QuizAttemptId,
-                        principalTable: "QuizAttempts",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -681,6 +698,50 @@ namespace DAL.Migrations
                         onDelete: ReferentialAction.Cascade);
                 });
 
+            migrationBuilder.CreateTable(
+                name: "StudentAnswers",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "int", nullable: false)
+                        .Annotation("SqlServer:Identity", "1, 1"),
+                    QuizAttemptId = table.Column<int>(type: "int", nullable: false),
+                    QuestionId = table.Column<int>(type: "int", nullable: false),
+                    IsDeleted = table.Column<bool>(type: "bit", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
+                    SelectedOptionId = table.Column<int>(type: "int", nullable: false),
+                    IsCorrect = table.Column<bool>(type: "bit", nullable: false),
+                    PointsEarned = table.Column<decimal>(type: "decimal(5,2)", precision: 5, scale: 2, nullable: false),
+                    OptionId = table.Column<int>(type: "int", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_StudentAnswers", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_StudentAnswers_Options_OptionId",
+                        column: x => x.OptionId,
+                        principalTable: "Options",
+                        principalColumn: "Id");
+                    table.ForeignKey(
+                        name: "FK_StudentAnswers_Options_SelectedOptionId",
+                        column: x => x.SelectedOptionId,
+                        principalTable: "Options",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_StudentAnswers_Questions_QuestionId",
+                        column: x => x.QuestionId,
+                        principalTable: "Questions",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_StudentAnswers_QuizAttempts_QuizAttemptId",
+                        column: x => x.QuizAttemptId,
+                        principalTable: "QuizAttempts",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
             migrationBuilder.CreateIndex(
                 name: "IX_Blacklists_BlockedAt",
                 table: "Blacklists",
@@ -700,6 +761,11 @@ namespace DAL.Migrations
                 name: "IX_Blacklists_UserId",
                 table: "Blacklists",
                 column: "UserId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_CourseAccessCodes_CourseId",
+                table: "CourseAccessCodes",
+                column: "CourseId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_CourseCodes_CourseId",
@@ -906,6 +972,11 @@ namespace DAL.Migrations
                 column: "IsRevoked");
 
             migrationBuilder.CreateIndex(
+                name: "IX_RefreshTokens_ReplacedByTokenId",
+                table: "RefreshTokens",
+                column: "ReplacedByTokenId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_RefreshTokens_TokenHash",
                 table: "RefreshTokens",
                 column: "TokenHash",
@@ -934,6 +1005,11 @@ namespace DAL.Migrations
                 columns: new[] { "CourseId", "DisplayOrder" });
 
             migrationBuilder.CreateIndex(
+                name: "IX_StudentAnswers_OptionId",
+                table: "StudentAnswers",
+                column: "OptionId");
+
+            migrationBuilder.CreateIndex(
                 name: "IX_StudentAnswers_QuestionId",
                 table: "StudentAnswers",
                 column: "QuestionId");
@@ -942,6 +1018,11 @@ namespace DAL.Migrations
                 name: "IX_StudentAnswers_QuizAttemptId_QuestionId",
                 table: "StudentAnswers",
                 columns: new[] { "QuizAttemptId", "QuestionId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_StudentAnswers_SelectedOptionId",
+                table: "StudentAnswers",
+                column: "SelectedOptionId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_UserClaims_UserId",
@@ -988,6 +1069,9 @@ namespace DAL.Migrations
                 name: "Blacklists");
 
             migrationBuilder.DropTable(
+                name: "CourseAccessCodes");
+
+            migrationBuilder.DropTable(
                 name: "CourseCodes");
 
             migrationBuilder.DropTable(
@@ -1007,9 +1091,6 @@ namespace DAL.Migrations
 
             migrationBuilder.DropTable(
                 name: "Notifications");
-
-            migrationBuilder.DropTable(
-                name: "Options");
 
             migrationBuilder.DropTable(
                 name: "ParentLinkCodes");
@@ -1042,7 +1123,7 @@ namespace DAL.Migrations
                 name: "Lessons");
 
             migrationBuilder.DropTable(
-                name: "Questions");
+                name: "Options");
 
             migrationBuilder.DropTable(
                 name: "QuizAttempts");
@@ -1052,6 +1133,9 @@ namespace DAL.Migrations
 
             migrationBuilder.DropTable(
                 name: "Sections");
+
+            migrationBuilder.DropTable(
+                name: "Questions");
 
             migrationBuilder.DropTable(
                 name: "Quizzes");

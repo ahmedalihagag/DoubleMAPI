@@ -6,9 +6,15 @@ using System.Threading.Tasks;
 
 namespace BLL.DTOs
 {
-    public class ChangePasswordDto
+    public class ForgotPasswordDto
     {
-        public string CurrentPassword { get; set; } = string.Empty;
-        public string NewPassword { get; set; } = string.Empty;
+        public string Email { get; set; } = null!;
+    }
+
+    public class ResetPasswordDto
+    {
+        public string UserId { get; set; } = null!;
+        public string Token { get; set; } = null!;
+        public string NewPassword { get; set; } = null!;
     }
 }

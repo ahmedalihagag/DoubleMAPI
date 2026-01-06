@@ -20,7 +20,14 @@ namespace DAL.Entities
         public string Text { get; set; }
 
         public bool IsCorrect { get; set; } = false;
+        public bool IsDeleted { get; set; } = false;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
 
         public int DisplayOrder { get; set; }
+
+        //navigation properties
+        public virtual ICollection<StudentAnswer> StudentAnswers { get; set; } = new List<StudentAnswer>();
+
     }
 }

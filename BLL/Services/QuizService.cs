@@ -6,6 +6,7 @@ using DAL.Entities;
 using DAL.Interfaces;
 using DAL.Pagination;
 using Microsoft.Extensions.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,7 +20,7 @@ namespace BLL.Services
         private readonly IUnitOfWork _unitOfWork;
         private readonly IMapper _mapper;
         private readonly IEmailService _emailService;
-        private readonly ILogger _logger;
+        private readonly Serilog.ILogger _logger;
 
         public QuizService(IUnitOfWork unitOfWork, IMapper mapper, IEmailService emailService)
         {
@@ -183,18 +184,7 @@ namespace BLL.Services
                 };
 
                 await _unitOfWork.Notifications.AddAsync(notification);
-                await _unitOfWork.CommitTransactionAsync();
-
-                // Send email
-                try
-                {
-                    await _emailService.SendQuizGradeEmailAsync(
-                        studentId, quiz.Title, (int)totalScore, (int)maxScore);
-                }
-                catch (Exception emailEx)
-                {
-                    _logger.Warning(emailEx, "Failed to send quiz grade email");
-                }
+                await _unitOfWork.CommitTransactionAsync();               
 
                 _logger.Information("Quiz submitted successfully - Score: {Score}/{MaxScore}", totalScore, maxScore);
                 return _mapper.Map<QuizAttemptDto>(attempt);

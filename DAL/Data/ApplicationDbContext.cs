@@ -38,6 +38,8 @@ namespace DAL.Data
         public DbSet<RefreshToken> RefreshTokens { get; set; }
         public DbSet<EmailLog> EmailLogs { get; set; }
         public DbSet<FileMetadata> FileMetadatas { get; set; }
+        public DbSet<CourseAccessCode> CourseAccessCodes { get; set; }
+
 
         protected override void OnModelCreating(ModelBuilder builder)
         {

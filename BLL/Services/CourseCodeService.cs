@@ -1,6 +1,8 @@
-﻿using DAL.Entities;
+﻿using AutoMapper;
+using BLL.DTOs.CourseDTOs;
+using BLL.Interfaces;
 using DAL.Interfaces;
-using Microsoft.Extensions.Logging;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,121 +14,91 @@ namespace BLL.Services
     public class CourseCodeService : ICourseCodeService
     {
         private readonly IUnitOfWork _unitOfWork;
+        private readonly IMapper _mapper;
         private readonly ILogger _logger;
 
-        public CourseCodeService(IUnitOfWork unitOfWork)
+        public CourseCodeService(IUnitOfWork unitOfWork, IMapper mapper)
         {
             _unitOfWork = unitOfWork;
+            _mapper = mapper;
             _logger = Log.ForContext<CourseCodeService>();
         }
 
-        public async Task<string> GenerateCourseCodeAsync(int courseId, string adminId, int expiryDays = 30)
+        public async Task<CourseCodeDto> GenerateCodeAsync(CreateCourseCodeDto dto)
         {
-            try
-            {
-                _logger.Information("Admin {AdminId} generating course code for course: {CourseId}",
-                    adminId, courseId);
+            var entity = await _unitOfWork.CourseCodes.GenerateCodeAsync(
+                dto.CourseId, dto.IssuedBy, dto.ExpiresAt);
 
-                var course = await _unitOfWork.Courses.GetByIdAsync(courseId);
-                if (course == null)
-                    throw new Exception("Course not found");
+            await _unitOfWork.SaveChangesAsync();
 
-                var code = GenerateRandomCode();
-                var expiresAt = DateTime.UtcNow.AddDays(expiryDays);
+            _logger.Information("Generated CourseCode {Code} for CourseId {CourseId}", entity.Code, dto.CourseId);
 
-                var courseCode = new CourseCode
-                {
-                    Code = code,
-                    CourseId = courseId,
-                    IssuedBy = adminId,
-                    ExpiresAt = expiresAt,
-                    CreatedAt = DateTime.UtcNow,
-                    IsUsed = false
-                };
-
-                await _unitOfWork.CourseCodes.AddAsync(courseCode);
-                await _unitOfWork.SaveChangesAsync();
-
-                _logger.Information("Course code generated: {Code} by admin: {AdminId}", code, adminId);
-                return code;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error generating course code");
-                throw;
-            }
+            return _mapper.Map<CourseCodeDto>(entity);
         }
 
-        public async Task<List<CourseCodeDto>> GetCourseCodesAsync(int courseId)
+        public async Task<bool> DisableCodeAsync(string code)
         {
-            try
-            {
-                _logger.Debug("Getting course codes for course: {CourseId}", courseId);
-
-                var codes = await _unitOfWork.CourseCodes
-                    .FindAllAsync(c => c.CourseId == courseId);
-
-                return codes.Select(c => new CourseCodeDto
-                {
-                    Code = c.Code,
-                    CourseId = c.CourseId,
-                    IssuedBy = c.IssuedBy,
-                    ExpiresAt = c.ExpiresAt,
-                    IsUsed = c.IsUsed,
-                    UsedAt = c.UsedAt,
-                    UsedBy = c.UsedBy
-                }).ToList();
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error getting course codes");
-                throw;
-            }
+            var result = await _unitOfWork.CourseCodes.DisableCodeAsync(code);
+            if (result)
+                _logger.Information("Disabled CourseCode {Code}", code);
+            return result;
         }
 
-        public async Task<bool> ValidateCourseCodeAsync(string code)
+        public async Task<bool> EnableCodeAsync(string code)
         {
-            try
-            {
-                var courseCode = await _unitOfWork.CourseCodes
-                    .FindAsync(c => c.Code == code && !c.IsUsed && c.ExpiresAt > DateTime.UtcNow);
-
-                return courseCode != null;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error validating course code");
-                throw;
-            }
+            var result = await _unitOfWork.CourseCodes.EnableCodeAsync(code);
+            if (result)
+                _logger.Information("Enabled CourseCode {Code}", code);
+            return result;
         }
 
-        public async Task<bool> RevokeCourseCodeAsync(string code, string adminId)
+        public async Task<bool> UseCodeAsync(string code, string studentId)
         {
-            try
-            {
-                _logger.Information("Admin {AdminId} revoking course code: {Code}", adminId, code);
+            var entity = await _unitOfWork.CourseCodes.GetByCodeAsync(code);
+            if (entity == null || entity.IsUsed || !entity.IsActive || entity.ExpiresAt < DateTime.UtcNow)
+                return false;
 
-                var courseCode = await _unitOfWork.CourseCodes.FindAsync(c => c.Code == code);
-                if (courseCode == null)
-                    return false;
+            entity.IsUsed = true;
+            entity.UsedAt = DateTime.UtcNow;
+            entity.UsedBy = studentId;
 
-                _unitOfWork.CourseCodes.Delete(courseCode);
-                await _unitOfWork.SaveChangesAsync();
+            _unitOfWork.CourseCodes.Update(entity);
+            await _unitOfWork.SaveChangesAsync();
 
-                _logger.Information("Course code revoked: {Code}", code);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error revoking course code");
-                throw;
-            }
+            _logger.Information("CourseCode {Code} used by student {StudentId}", code, studentId);
+            return true;
         }
 
-        private string GenerateRandomCode()
+        public async Task<CourseCodeDto?> GetByCodeAsync(string code)
         {
-            return Guid.NewGuid().ToString("N").Substring(0, 12).ToUpper();
+            var entity = await _unitOfWork.CourseCodes.GetByCodeAsync(code);
+            return entity == null ? null : _mapper.Map<CourseCodeDto>(entity);
+        }
+
+        public async Task<IEnumerable<CourseCodeDto>> GetActiveCodesByCourseAsync(int courseId)
+        {
+            var entities = await _unitOfWork.CourseCodes.GetActiveCodesByCourseIdAsync(courseId);
+            return entities.Select(c => _mapper.Map<CourseCodeDto>(c));
+        }
+
+        public async Task<bool> UpdateCodeAsync(string code, UpdateCourseCodeDto dto)
+        {
+            var entity = await _unitOfWork.CourseCodes.GetByCodeAsync(code);
+            if (entity == null) return false;
+
+            entity.IsActive = dto.IsActive;
+            if (dto.ExpiresAt.HasValue)
+                entity.ExpiresAt = dto.ExpiresAt.Value;
+
+            entity.UpdatedAt = DateTime.UtcNow;
+
+            _unitOfWork.CourseCodes.Update(entity);
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.Information("Updated CourseCode {Code}: IsActive={IsActive}, ExpiresAt={ExpiresAt}",
+                code, dto.IsActive, dto.ExpiresAt);
+
+            return true;
         }
     }
-
 }

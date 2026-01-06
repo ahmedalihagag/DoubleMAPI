@@ -19,6 +19,8 @@ namespace DAL.Entities
         [MaxLength(200)]
         public string Title { get; set; }
 
+        public bool IsDeleted { get; set; } = false;
+
         public int DisplayOrder { get; set; }
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

@@ -2,16 +2,10 @@
 using BLL.DTOs;
 using BLL.DTOs.UserDTOs;
 using BLL.Interfaces;
-using DAL.Entities;
 using DAL.Interfaces;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Microsoft.IdentityModel.Tokens;
 using System;
 using System.Collections.Generic;
-using System.IdentityModel.Tokens.Jwt;
 using System.Linq;
 using System.Security.Claims;
 using System.Text;
@@ -21,271 +15,190 @@ namespace BLL.Services
 {
     public class AuthService : IAuthService
     {
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly IConfiguration _configuration;
-        private readonly IUnitOfWork _unitOfWork;
-        private readonly IMapper _mapper;
+        private readonly IUnitOfWork _uow;
         private readonly IEmailService _emailService;
-        private readonly ILogger _logger;
-        private readonly JwtSettings _jwtSettings;
+        private readonly ITokenService _tokenService;
+        private readonly IMapper _mapper;
 
         public AuthService(
-            UserManager<ApplicationUser> userManager,
-            SignInManager<ApplicationUser> signInManager,
-            IConfiguration configuration,
-            IUnitOfWork unitOfWork,
-            IMapper mapper,
+            IUnitOfWork uow,
             IEmailService emailService,
-            IOptions<JwtSettings> jwtSettings)
+            ITokenService tokenService,
+            IMapper mapper)
         {
-            _userManager = userManager;
-            _signInManager = signInManager;
-            _configuration = configuration;
-            _unitOfWork = unitOfWork;
-            _mapper = mapper;
+            _uow = uow;
             _emailService = emailService;
-            _logger = Log.ForContext<AuthService>();
-            _jwtSettings = jwtSettings.Value;
+            _tokenService = tokenService;
+            _mapper = mapper;
         }
 
-        public async Task<AuthResponseDto> RegisterAsync(RegisterDto registerDto)
+        // -------------------------
+        // Register
+        // -------------------------
+        public async Task<AuthResponseDto> RegisterUserAsync(RegisterUserDto dto)
         {
-            try
+            // Check if user exists
+            var existingUser = await _uow.UserManager.FindByEmailAsync(dto.Email);
+            if (existingUser != null)
+                return new AuthResponseDto { IsSuccess = false, Message = "Email already exists" };
+
+            // Create new user
+            var user = new DAL.Entities.ApplicationUser
             {
-                _logger.Information("Registering user: {Email} with role: {Role}",
-                    registerDto.Email, registerDto.Role);
-
-                var user = _mapper.Map<ApplicationUser>(registerDto);
-
-                var result = await _userManager.CreateAsync(user, registerDto.Password);
-
-                if (!result.Succeeded)
-                {
-                    var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                    _logger.Warning("User registration failed: {Errors}", errors);
-                    throw new Exception($"Registration failed: {errors}");
-                }
-
-                await _userManager.AddToRoleAsync(user, registerDto.Role);
-
-                // Send welcome email
-                try
-                {
-                    await _emailService.SendWelcomeEmailAsync(user.Email, user.FullName ?? "User");
-                }
-                catch (Exception emailEx)
-                {
-                    _logger.Warning(emailEx, "Failed to send welcome email");
-                }
-
-                _logger.Information("User registered successfully: {Email}", registerDto.Email);
-
-                return await GenerateAuthResponseAsync(user);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error registering user: {Email}", registerDto.Email);
-                throw;
-            }
-        }
-
-        public async Task<AuthResponseDto> LoginAsync(LoginDto loginDto)
-        {
-            try
-            {
-                _logger.Information("User login attempt: {Email}", loginDto.Email);
-
-                var user = await _userManager.FindByEmailAsync(loginDto.Email);
-                if (user == null)
-                {
-                    _logger.Warning("User not found: {Email}", loginDto.Email);
-                    throw new UnauthorizedAccessException("Invalid credentials");
-                }
-
-                // Check if user is blocked
-                var isBlocked = await _unitOfWork.Blacklists.IsUserBlockedAsync(user.Id);
-                if (isBlocked)
-                {
-                    _logger.Warning("Blocked user attempted login: {Email}", loginDto.Email);
-                    throw new UnauthorizedAccessException("Your account has been blocked");
-                }
-
-                var result = await _signInManager.CheckPasswordSignInAsync(user, loginDto.Password, false);
-
-                if (!result.Succeeded)
-                {
-                    _logger.Warning("Invalid password for user: {Email}", loginDto.Email);
-                    throw new UnauthorizedAccessException("Invalid credentials");
-                }
-
-                _logger.Information("User logged in successfully: {Email}", loginDto.Email);
-
-                return await GenerateAuthResponseAsync(user);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error during login: {Email}", loginDto.Email);
-                throw;
-            }
-        }
-
-        public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto refreshTokenDto)
-        {
-            try
-            {
-                _logger.Debug("Refreshing token");
-
-                var storedToken = await _unitOfWork.RefreshTokens
-                    .GetByTokenHashAsync(HashToken(refreshTokenDto.RefreshToken));
-
-                if (storedToken == null || storedToken.ExpiresAt < DateTime.UtcNow)
-                {
-                    _logger.Warning("Invalid or expired refresh token");
-                    throw new UnauthorizedAccessException("Invalid refresh token");
-                }
-
-                var user = await _userManager.FindByIdAsync(storedToken.UserId);
-                if (user == null)
-                    throw new UnauthorizedAccessException("User not found");
-
-                // Revoke old token
-                storedToken.IsRevoked = true;
-                storedToken.RevokedAt = DateTime.UtcNow;
-                _unitOfWork.RefreshTokens.Update(storedToken);
-                await _unitOfWork.SaveChangesAsync();
-
-                _logger.Information("Token refreshed for user: {UserId}", user.Id);
-
-                return await GenerateAuthResponseAsync(user);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error refreshing token");
-                throw;
-            }
-        }
-
-        public async Task<bool> LogoutAsync(string userId)
-        {
-            try
-            {
-                _logger.Information("User logout: {UserId}", userId);
-
-                await _unitOfWork.RefreshTokens.RevokeAllUserTokensAsync(userId);
-                await _unitOfWork.SaveChangesAsync();
-
-                _logger.Information("User logged out successfully: {UserId}", userId);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error during logout: {UserId}", userId);
-                throw;
-            }
-        }
-
-        public async Task<bool> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
-        {
-            try
-            {
-                _logger.Information("Changing password for user: {UserId}", userId);
-
-                var user = await _userManager.FindByIdAsync(userId);
-                if (user == null)
-                    return false;
-
-                var result = await _userManager.ChangePasswordAsync(user, currentPassword, newPassword);
-
-                if (result.Succeeded)
-                {
-                    _logger.Information("Password changed successfully for user: {UserId}", userId);
-                    return true;
-                }
-
-                var errors = string.Join(", ", result.Errors.Select(e => e.Description));
-                _logger.Warning("Password change failed: {Errors}", errors);
-                return false;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error changing password for user: {UserId}", userId);
-                throw;
-            }
-        }
-
-        private async Task<AuthResponseDto> GenerateAuthResponseAsync(ApplicationUser user)
-        {
-            var roles = await _userManager.GetRolesAsync(user);
-            var token = GenerateJwtToken(user, roles.ToList());
-            var refreshToken = GenerateRefreshToken();
-
-            // Store refresh token
-            var refreshTokenEntity = new RefreshToken
-            {
-                UserId = user.Id,
-                TokenHash = HashToken(refreshToken),
-                ExpiresAt = DateTime.UtcNow.AddDays(_jwtSettings.RefreshTokenExpiryDays),
+                Email = dto.Email,
+                UserName = dto.Email,
+                FullName = dto.FullName,
+                PhoneNumber = dto.PhoneNumber,
                 CreatedAt = DateTime.UtcNow
             };
 
-            await _unitOfWork.RefreshTokens.AddAsync(refreshTokenEntity);
-            await _unitOfWork.SaveChangesAsync();
+            var result = await _uow.UserManager.CreateAsync(user, dto.Password);
+            if (!result.Succeeded)
+                return new AuthResponseDto { IsSuccess = false, Message = string.Join("; ", result.Errors) };
 
-            var userDto = _mapper.Map<UserDto>(user);
-            userDto.Roles = roles.ToList();
+            // Ensure role exists
+            if (!await _uow.RoleManager.RoleExistsAsync(dto.Role))
+                await _uow.RoleManager.CreateAsync(new IdentityRole(dto.Role));
+
+            await _uow.UserManager.AddToRoleAsync(user, dto.Role);
+
+            // Send confirmation email
+            var emailToken = await _uow.UserManager.GenerateEmailConfirmationTokenAsync(user);
+            await _emailService.SendAsync(dto.Email, "Confirm your email",
+                $"Welcome {dto.FullName}, click <a href='https://yourdomain.com/account/confirm-email?token={emailToken}'>here</a> to confirm your email.");
 
             return new AuthResponseDto
             {
-                Token = token,
+                IsSuccess = true,
+                Message = "Registration successful. Please confirm your email."
+            };
+        }
+
+
+        // -------------------------
+        // Login
+        // -------------------------
+        public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
+        {
+            var user = await _uow.UserManager.FindByEmailAsync(dto.Email);
+            if (user == null)
+                return new AuthResponseDto { IsSuccess = false, Message = "Invalid credentials" };
+
+            if (!await _uow.UserManager.CheckPasswordAsync(user, dto.Password))
+                return new AuthResponseDto { IsSuccess = false, Message = "Invalid credentials" };
+
+            if (!user.EmailConfirmed)
+                return new AuthResponseDto { IsSuccess = false, Message = "Email not confirmed" };
+
+            // Map user to DTO
+            var userDto = _mapper.Map<UserDto>(user);
+            userDto.Roles = (await _uow.UserManager.GetRolesAsync(user)).ToList();
+
+            // Generate tokens
+            var jwtToken = await _tokenService.GenerateJwtTokenAsync(userDto);
+            var refreshToken = await _tokenService.GenerateRefreshTokenAsync(user.Id);
+
+            return new AuthResponseDto
+            {
+                IsSuccess = true,
+                Token = jwtToken,
                 RefreshToken = refreshToken,
-                ExpiresAt = DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes),
+                Message = "Login successful",
                 User = userDto
             };
         }
 
-        private string GenerateJwtToken(ApplicationUser user, List<string> roles)
+        // -------------------------
+        // Refresh Token
+        // -------------------------
+        public async Task<AuthResponseDto> RefreshTokenAsync(RefreshTokenDto dto)
         {
-            var claims = new List<Claim>
+            var principal = _tokenService.GetPrincipalFromExpiredToken(dto.Token);
+            if (principal == null)
+                return new AuthResponseDto { IsSuccess = false, Message = "Invalid token" };
+
+            var userId = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (userId == null)
+                return new AuthResponseDto { IsSuccess = false, Message = "Invalid token" };
+
+            var valid = await _tokenService.ValidateRefreshTokenAsync(dto.RefreshToken, userId);
+            if (!valid)
+                return new AuthResponseDto { IsSuccess = false, Message = "Invalid refresh token" };
+
+            var user = await _uow.UserManager.FindByIdAsync(userId);
+            if (user == null)
+                return new AuthResponseDto { IsSuccess = false, Message = "User not found" };
+
+            var userDto = _mapper.Map<UserDto>(user);
+            userDto.Roles = (await _uow.UserManager.GetRolesAsync(user)).ToList();
+
+            var newJwt = await _tokenService.GenerateJwtTokenAsync(userDto);
+            var newRefresh = await _tokenService.RotateRefreshTokenAsync(dto.RefreshToken, user.Id);
+
+            return new AuthResponseDto
             {
-                new Claim(ClaimTypes.NameIdentifier, user.Id),
-                new Claim(ClaimTypes.Email, user.Email),
-                new Claim(ClaimTypes.Name, user.FullName ?? user.Email),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+                IsSuccess = true,
+                Token = newJwt,
+                RefreshToken = newRefresh,
+                Message = "Token refreshed successfully",
+                User = userDto
             };
-
-            foreach (var role in roles)
-            {
-                claims.Add(new Claim(ClaimTypes.Role, role));
-            }
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.SecretKey));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _jwtSettings.Issuer,
-                audience: _jwtSettings.Audience,
-                claims: claims,
-                expires: DateTime.UtcNow.AddMinutes(_jwtSettings.ExpiryMinutes),
-                signingCredentials: creds
-            );
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
         }
 
-        private string GenerateRefreshToken()
+
+        // -------------------------
+        // Logout
+        // -------------------------
+        public async Task<bool> LogoutAsync(string userId)
         {
-            var randomBytes = new byte[64];
-            using var rng = System.Security.Cryptography.RandomNumberGenerator.Create();
-            rng.GetBytes(randomBytes);
-            return Convert.ToBase64String(randomBytes);
+            await _tokenService.RevokeRefreshTokensAsync(userId);
+            return true;
         }
 
-        private string HashToken(string token)
+        // -------------------------
+        // Change Password
+        // -------------------------
+        public async Task<bool> ChangePasswordAsync(string userId, string currentPassword, string newPassword)
         {
-            using var sha256 = System.Security.Cryptography.SHA256.Create();
-            var hashedBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(token));
-            return Convert.ToBase64String(hashedBytes);
+            var user = await _uow.UserManager.FindByIdAsync(userId);
+            if (user == null) return false;
+
+            var result = await _uow.UserManager.ChangePasswordAsync(user, currentPassword, newPassword);
+            return result.Succeeded;
+        }
+
+        // -------------------------
+        // Email Confirmation
+        // -------------------------
+        public async Task<bool> ConfirmEmailAsync(string userId, string token)
+        {
+            var user = await _uow.UserManager.FindByIdAsync(userId);
+            if (user == null) return false;
+
+            var result = await _uow.UserManager.ConfirmEmailAsync(user, token);
+            return result.Succeeded;
+        }
+
+        // -------------------------
+        // Forgot / Reset Password
+        // -------------------------
+        public async Task SendPasswordResetAsync(ForgotPasswordDto dto)
+        {
+            var user = await _uow.UserManager.FindByEmailAsync(dto.Email);
+            if (user == null) return;
+
+            var token = await _uow.UserManager.GeneratePasswordResetTokenAsync(user);
+            await _emailService.SendAsync(dto.Email, "Reset Password",
+                $"Click <a href='https://yourdomain.com/account/reset-password?token={token}'>here</a> to reset your password.");
+        }
+
+        public async Task<bool> ResetPasswordAsync(ResetPasswordDto dto)
+        {
+            var user = await _uow.UserManager.FindByIdAsync(dto.UserId);
+            if (user == null) return false;
+
+            var result = await _uow.UserManager.ResetPasswordAsync(user, dto.Token, dto.NewPassword);
+            return result.Succeeded;
         }
     }
 }

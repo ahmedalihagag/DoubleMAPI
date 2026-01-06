@@ -2,6 +2,7 @@
 using BLL.DTOs.SectionDTOs;
 using BLL.Interfaces;
 using DAL.Interfaces;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -16,99 +17,78 @@ namespace BLL.Services
     public class SectionService : ISectionService
     {
         private readonly IUnitOfWork _unitOfWork;
-        private readonly IMapper _mapper;
-        private readonly ILogger _logger;
+        private readonly ILogger<SectionService> _logger;
 
-        public SectionService(IUnitOfWork unitOfWork, IMapper mapper)
+        public SectionService(IUnitOfWork unitOfWork, ILogger<SectionService> logger)
         {
             _unitOfWork = unitOfWork;
-            _mapper = mapper;
-            _logger = Log.ForContext<SectionService>();
+            _logger = logger;
         }
 
-        public async Task<SectionDto> CreateSectionAsync(CreateSectionDto createSectionDto)
+        public async Task<SectionDto> CreateAsync(CreateSectionDto dto)
         {
-            try
-            {
-                _logger.Information("Creating section: {Title} for course: {CourseId}",
-                    createSectionDto.Title, createSectionDto.CourseId);
+            var id = await _unitOfWork.Sections.CreateAsync(
+                dto.CourseId,
+                dto.Title,
+                dto.DisplayOrder);
 
-                var section = _mapper.Map<Section>(createSectionDto);
-                await _unitOfWork.Sections.AddAsync(section);
-                await _unitOfWork.SaveChangesAsync();
+            _logger.LogInformation("Created Section Id {Id}", id);
 
-                _logger.Information("Section created: {SectionId}", section.Id);
-                return _mapper.Map<SectionDto>(section);
-            }
-            catch (Exception ex)
+            return new SectionDto
             {
-                _logger.Error(ex, "Error creating section");
-                throw;
-            }
+                Id = id,
+                CourseId = dto.CourseId,
+                Title = dto.Title,
+                DisplayOrder = dto.DisplayOrder
+            };
         }
 
-        public async Task<SectionDto?> GetSectionByIdAsync(int sectionId)
+        public async Task<bool> UpdateAsync(int sectionId, CreateSectionDto dto)
         {
-            try
-            {
-                var section = await _unitOfWork.Sections.GetByIdAsync(sectionId);
-                return section == null ? null : _mapper.Map<SectionDto>(section);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error getting section: {SectionId}", sectionId);
-                throw;
-            }
+            var updated = await _unitOfWork.Sections.UpdateAsync(
+                sectionId,
+                dto.Title,
+                dto.DisplayOrder);
+
+            if (!updated)
+                _logger.LogWarning("Section {Id} not found for update", sectionId);
+            return updated;
         }
 
-        public async Task<bool> UpdateSectionAsync(int sectionId, CreateSectionDto updateDto)
+        public async Task<bool> DeleteAsync(int sectionId)
         {
-            try
-            {
-                _logger.Information("Updating section: {SectionId}", sectionId);
+            var deleted = await _unitOfWork.Sections.SoftDeleteAsync(sectionId);
 
-                var section = await _unitOfWork.Sections.GetByIdAsync(sectionId);
-                if (section == null)
-                    return false;
-
-                section.Title = updateDto.Title;
-                section.DisplayOrder = updateDto.DisplayOrder;
-                section.UpdatedAt = DateTime.UtcNow;
-
-                _unitOfWork.Sections.Update(section);
-                await _unitOfWork.SaveChangesAsync();
-
-                _logger.Information("Section updated: {SectionId}", sectionId);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error updating section: {SectionId}", sectionId);
-                throw;
-            }
+            if (!deleted)
+                _logger.LogWarning("Section {Id} not found for delete", sectionId);
+            return deleted;
         }
 
-        public async Task<bool> DeleteSectionAsync(int sectionId)
+        public async Task<SectionDto?> GetByIdAsync(int sectionId)
         {
-            try
+            var data = await _unitOfWork.Sections.GetByIdAsync(sectionId);
+            if (data == null) return null;
+
+            return new SectionDto
             {
-                _logger.Information("Deleting section: {SectionId}", sectionId);
+                Id = data.Value.Id,
+                CourseId = data.Value.CourseId,
+                Title = data.Value.Title,
+                DisplayOrder = data.Value.DisplayOrder
+            };
+        }
 
-                var section = await _unitOfWork.Sections.GetByIdAsync(sectionId);
-                if (section == null)
-                    return false;
+        public async Task<IEnumerable<SectionDto>> GetAllByCourseIdAsync(int courseId)
+        {
+            var list = await _unitOfWork.Sections.GetAllByCourseIdAsync(courseId);
 
-                _unitOfWork.Sections.Delete(section);
-                await _unitOfWork.SaveChangesAsync();
-
-                _logger.Information("Section deleted: {SectionId}", sectionId);
-                return true;
-            }
-            catch (Exception ex)
+            return list.Select(s => new SectionDto
             {
-                _logger.Error(ex, "Error deleting section: {SectionId}", sectionId);
-                throw;
-            }
+                Id = s.Id,
+                CourseId = s.CourseId,
+                Title = s.Title,
+                DisplayOrder = s.DisplayOrder
+            });
         }
     }
 }

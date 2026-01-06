@@ -13,6 +13,5 @@ namespace BLL.Interfaces
         Task<string> GenerateLinkCodeAsync(string studentId);
         Task<bool> LinkParentToStudentAsync(string parentId, string code);
         Task<List<StudentInfoDto>> GetLinkedStudentsAsync(string parentId);
-        Task<List<CourseProgressDto>> GetStudentProgressAsync(string parentId, string studentId);
     }
 }

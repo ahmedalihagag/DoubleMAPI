@@ -24,6 +24,10 @@ namespace DAL.Entities
 
         public decimal Points { get; set; } = 1;
 
+        public bool IsDeleted { get; set; } = false;
+        public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+        public DateTime? UpdatedAt { get; set; }
+
         public int DisplayOrder { get; set; }
 
         [MaxLength(50)]
