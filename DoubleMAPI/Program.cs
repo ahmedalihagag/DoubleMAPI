@@ -1,4 +1,4 @@
-using AutoMapper;
+﻿using AutoMapper;
 using BLL.Interfaces;
 using BLL.Mappings;
 using BLL.Services;
@@ -37,10 +37,11 @@ try
     // Use Serilog
     builder.Host.UseSerilog();
 
-    // Configuration Binding
+    // Bind Configuration
     builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
     builder.Services.Configure<BunnySettings>(builder.Configuration.GetSection("BunnySettings"));
     builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
+    builder.Services.Configure<AdminUserSettings>(builder.Configuration.GetSection("AdminUser"));
 
     // Database
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -55,7 +56,7 @@ try
         options.Password.RequireNonAlphanumeric = true;
         options.Password.RequiredLength = 8;
         options.User.RequireUniqueEmail = true;
-        options.SignIn.RequireConfirmedEmail = false; // Set to true in production
+        options.SignIn.RequireConfirmedEmail = false; // Set true in production
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
@@ -93,10 +94,8 @@ try
         options.AddPolicy("StudentOrParent", policy => policy.RequireRole("Student", "Parent"));
     });
 
-    // Register Unit of Work
+    // Register Unit of Work & Services
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
-
-    // Register Business Logic Services
     builder.Services.AddScoped<ICourseService, CourseService>();
     builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
     builder.Services.AddScoped<IQuizService, QuizService>();
@@ -110,17 +109,12 @@ try
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<ITokenService, TokenService>();
 
-
-    // Register Infrastructure Services
+    // Infrastructure Services
     builder.Services.AddScoped<IEmailService, FluentEmailService>();
     builder.Services.AddHttpClient<IMediaService, MediaService>();
 
     // AutoMapper
-    builder.Services.AddAutoMapper(cfg =>
-    {
-        cfg.AddProfile<MappingProfile>();
-    });
-
+    builder.Services.AddAutoMapper(cfg => cfg.AddProfile<MappingProfile>());
 
     // Controllers
     builder.Services.AddControllers();
@@ -134,7 +128,7 @@ try
             Description = "Double M Educational Platform API"
         });
 
-        // Add JWT Authentication to Swagger
+        // JWT for Swagger
         c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
         {
             Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
@@ -175,7 +169,6 @@ try
 
     // Middleware
     app.UseSerilogRequestLogging();
-
     if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
@@ -193,7 +186,8 @@ try
     {
         var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
         var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        await SeedRolesAndAdminAsync(roleManager, userManager);
+        var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+        await SeedRolesAndAdminAsync(roleManager, userManager, config);
     }
 
     Log.Information("Double M API started successfully");
@@ -208,11 +202,16 @@ finally
     Log.CloseAndFlush();
 }
 
-async Task SeedRolesAndAdminAsync(RoleManager<IdentityRole> roleManager, UserManager<ApplicationUser> userManager)
+// ---------------- Seed Roles & Admin ----------------
+
+async Task SeedRolesAndAdminAsync(
+    RoleManager<IdentityRole> roleManager,
+    UserManager<ApplicationUser> userManager,
+    IConfiguration configuration)
 {
     try
     {
-        // Seed Roles
+        // 1️⃣ Seed Roles
         string[] roles = { "Admin", "Teacher", "Student", "Parent" };
         foreach (var role in roles)
         {
@@ -223,34 +222,44 @@ async Task SeedRolesAndAdminAsync(RoleManager<IdentityRole> roleManager, UserMan
             }
         }
 
-        // Seed Default Admin User
-        var adminEmail = "admin@doublem.com";
-        var adminUser = await userManager.FindByEmailAsync(adminEmail);
+        // 2️⃣ Seed Admin User from appsettings
+        var adminSettings = configuration.GetSection("AdminUser").Get<AdminUserSettings>();
 
+        if (adminSettings == null)
+        {
+            Log.Warning("AdminUser settings missing in configuration. Skipping admin seeding.");
+            return;
+        }
+
+        var adminUser = await userManager.FindByEmailAsync(adminSettings.Email);
         if (adminUser == null)
         {
             adminUser = new ApplicationUser
             {
-                UserName = adminEmail,
-                Email = adminEmail,
-                FullName = "Double M Administrator",
+                UserName = adminSettings.Email,
+                Email = adminSettings.Email,
+                FullName = adminSettings.FullName,
                 EmailConfirmed = true,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             };
 
-            var result = await userManager.CreateAsync(adminUser, "Admin@123456");
+            var result = await userManager.CreateAsync(adminUser, adminSettings.Password);
 
             if (result.Succeeded)
             {
                 await userManager.AddToRoleAsync(adminUser, "Admin");
-                Log.Information("Default admin user created: {Email}", adminEmail);
+                Log.Information("Default admin user created: {Email}", adminSettings.Email);
             }
             else
             {
                 Log.Error("Failed to create admin user: {Errors}",
                     string.Join(", ", result.Errors.Select(e => e.Description)));
             }
+        }
+        else
+        {
+            Log.Information("Admin user already exists: {Email}", adminSettings.Email);
         }
     }
     catch (Exception ex)
