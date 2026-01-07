@@ -15,19 +15,30 @@ namespace DAL.Entities
 
         [Required]
         [MaxLength(20)]
-        public string Code { get; set; }
+        public string Code { get; set; } = null!;
 
         [Required]
         public int CourseId { get; set; }
-        public virtual Course Course { get; set; }
+        public virtual Course Course { get; set; } = null!;
+
+        [Required]
+        [MaxLength(450)]
+        public string CreatedBy { get; set; } = null!;
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-        public DateTime UsedAt { get; set; }
+
+        [Required]
         public DateTime ExpiresAt { get; set; }
-        public string CreatedBy { get; set; }
 
         public bool IsUsed { get; set; } = false;
+
+        public DateTime? UsedAt { get; set; }
+
+        [MaxLength(450)]
+        public string? UsedBy { get; set; }
+
         public bool IsDisabled { get; set; } = false;
+
         public DateTime? DisabledAt { get; set; }
     }
 }

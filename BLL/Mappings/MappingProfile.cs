@@ -26,7 +26,7 @@ namespace BLL.Mappings
         {
             // User Mappings
             CreateMap<ApplicationUser, UserDto>()
-                .ForMember(dest => dest.Roles, opt => opt.Ignore()); // Populated manually
+                .ForMember(dest => dest.Roles, opt => opt.Ignore());
 
             CreateMap<RegisterUserDto, ApplicationUser>()
                 .ForMember(dest => dest.UserName, opt => opt.MapFrom(src => src.Email))
@@ -44,13 +44,6 @@ namespace BLL.Mappings
                 .ForMember(dest => dest.Quizzes, opt => opt.MapFrom(src => src.Quizzes));
 
             CreateMap<CreateCourseDto, Course>()
-                 .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
-                 .ForMember(dest => dest.IsPublished, opt => opt.MapFrom(src => false));
-            CreateMap<UpdateCourseDto, Course>()
-                .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
-                .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
-
-            CreateMap<CreateCourseDto, Course>()
                 .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
                 .ForMember(dest => dest.IsPublished, opt => opt.MapFrom(src => false));
 
@@ -58,14 +51,25 @@ namespace BLL.Mappings
                 .ForMember(dest => dest.UpdatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
                 .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
 
+            // Course Code Mappings
             CreateMap<CourseCode, CourseCodeDto>().ReverseMap();
             CreateMap<CreateCourseCodeDto, CourseCode>();
             CreateMap<UpdateCourseCodeDto, CourseCode>()
                 .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null));
 
+            // Course Access Code Mappings
+                CreateMap<CourseAccessCode, CourseAccessCodeDto>()
+                .ForMember(dest => dest.IsValid, opt => opt.Ignore())
+                .ForMember(dest => dest.DaysRemaining, opt => opt.Ignore());
+
+            CreateMap<CourseAccessCode, CourseAccessCodeStatsDto>()
+                .ForMember(dest => dest.IsExpired, opt => opt.Ignore())
+                .ForMember(dest => dest.DaysRemaining, opt => opt.Ignore())
+                .ForMember(dest => dest.Status, opt => opt.Ignore());
+
             // Section Mappings
             CreateMap<Section, SectionDto>();
-            CreateMap<CreateSectionDto, Section>(); 
+            CreateMap<CreateSectionDto, Section>();
 
             // Lesson Mappings
             CreateMap<Lesson, LessonDto>()

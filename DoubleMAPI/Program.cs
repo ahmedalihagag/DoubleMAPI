@@ -1,6 +1,7 @@
 ﻿using AutoMapper;
 using BLL.Interfaces;
 using BLL.Mappings;
+using BLL.Seeder;
 using BLL.Services;
 using BLL.Settings;
 using DAL.Data;
@@ -45,7 +46,9 @@ try
 
     // Database
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
-        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+
+
 
     // Identity
     builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -105,6 +108,7 @@ try
     builder.Services.AddScoped<ISectionService, SectionService>();
     builder.Services.AddScoped<ILessonService, LessonService>();
     builder.Services.AddScoped<ICourseCodeService, CourseCodeService>();
+    builder.Services.AddScoped<ICourseAccessCodeService, CourseAccessCodeService>();
     builder.Services.AddScoped<IFileService, FileService>();
     builder.Services.AddScoped<IAuthService, AuthService>();
     builder.Services.AddScoped<ITokenService, TokenService>();
@@ -184,13 +188,16 @@ try
     // Seed Roles and Admin User
     using (var scope = app.Services.CreateScope())
     {
-        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
-        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
-        var config = scope.ServiceProvider.GetRequiredService<IConfiguration>();
-        await SeedRolesAndAdminAsync(roleManager, userManager, config);
+        var services = scope.ServiceProvider;
+        var config = services.GetRequiredService<IConfiguration>();
+
+        await DataSeeder.SeedRolesAndAdminAsync(
+            services.GetRequiredService<RoleManager<IdentityRole>>(),
+            services.GetRequiredService<UserManager<ApplicationUser>>(),
+            config
+        );
     }
 
-    Log.Information("Double M API started successfully");
     app.Run();
 }
 catch (Exception ex)
@@ -200,70 +207,4 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
-}
-
-// ---------------- Seed Roles & Admin ----------------
-
-async Task SeedRolesAndAdminAsync(
-    RoleManager<IdentityRole> roleManager,
-    UserManager<ApplicationUser> userManager,
-    IConfiguration configuration)
-{
-    try
-    {
-        // 1️⃣ Seed Roles
-        string[] roles = { "Admin", "Teacher", "Student", "Parent" };
-        foreach (var role in roles)
-        {
-            if (!await roleManager.RoleExistsAsync(role))
-            {
-                await roleManager.CreateAsync(new IdentityRole(role));
-                Log.Information("Role {Role} created", role);
-            }
-        }
-
-        // 2️⃣ Seed Admin User from appsettings
-        var adminSettings = configuration.GetSection("AdminUser").Get<AdminUserSettings>();
-
-        if (adminSettings == null)
-        {
-            Log.Warning("AdminUser settings missing in configuration. Skipping admin seeding.");
-            return;
-        }
-
-        var adminUser = await userManager.FindByEmailAsync(adminSettings.Email);
-        if (adminUser == null)
-        {
-            adminUser = new ApplicationUser
-            {
-                UserName = adminSettings.Email,
-                Email = adminSettings.Email,
-                FullName = adminSettings.FullName,
-                EmailConfirmed = true,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            var result = await userManager.CreateAsync(adminUser, adminSettings.Password);
-
-            if (result.Succeeded)
-            {
-                await userManager.AddToRoleAsync(adminUser, "Admin");
-                Log.Information("Default admin user created: {Email}", adminSettings.Email);
-            }
-            else
-            {
-                Log.Error("Failed to create admin user: {Errors}",
-                    string.Join(", ", result.Errors.Select(e => e.Description)));
-            }
-        }
-        else
-        {
-            Log.Information("Admin user already exists: {Email}", adminSettings.Email);
-        }
-    }
-    catch (Exception ex)
-    {
-        Log.Error(ex, "Error seeding roles and admin user");
-    }
 }

@@ -19,39 +19,62 @@ namespace DAL.Fluent_API
             // Primary Key
             builder.HasKey(c => c.Id);
 
-            // Properties
+            // Required Properties
             builder.Property(c => c.Code)
                    .IsRequired()
                    .HasMaxLength(20);
 
-            builder.Property(c => c.IsUsed)
-                   .IsRequired()
-                   .HasDefaultValue(false);
-
-            builder.Property(c => c.CreatedAt)
-                   .IsRequired()
-                   .HasDefaultValueSql("GETUTCDATE()");
+            builder.Property(c => c.CourseId)
+                   .IsRequired();
 
             builder.Property(c => c.CreatedBy)
                    .IsRequired()
                    .HasMaxLength(450);
 
-            // Relationships
-            builder.HasOne(c => c.Course)
-                   .WithMany(c => c.AccessCodes) // Make sure Course has ICollection<CourseAccessCode> AccessCodes
-                   .HasForeignKey(c => c.CourseId)
-                   .OnDelete(DeleteBehavior.Cascade);
+            builder.Property(c => c.CreatedAt)
+                   .IsRequired()
+                   .HasDefaultValueSql("GETUTCDATE()");
 
-            // Index for fast lookup by Code
-            builder.HasIndex(c => c.Code)
-                   .IsUnique();
+            builder.Property(c => c.ExpiresAt)
+                   .IsRequired();
 
-            // Optional properties
+            builder.Property(c => c.IsUsed)
+                   .IsRequired()
+                   .HasDefaultValue(false);
+
+            builder.Property(c => c.IsDisabled)
+                   .IsRequired()
+                   .HasDefaultValue(false);
+
+            // Optional Properties
             builder.Property(c => c.UsedAt)
                    .IsRequired(false);
 
-            builder.Property(c => c.ExpiresAt)
+            builder.Property(c => c.UsedBy)
+                   .HasMaxLength(450)
                    .IsRequired(false);
+
+            builder.Property(c => c.DisabledAt)
+                   .IsRequired(false);
+
+            // Relationships
+            builder.HasOne(c => c.Course)
+                   .WithMany(c => c.AccessCodes)
+                   .HasForeignKey(c => c.CourseId)
+                   .OnDelete(DeleteBehavior.Cascade);
+
+            // Indexes for performance
+            builder.HasIndex(c => c.Code)
+                   .IsUnique();
+
+            builder.HasIndex(c => new { c.CourseId, c.IsUsed, c.IsDisabled })
+                   .HasDatabaseName("IX_CourseAccessCode_CourseId_IsUsed_IsDisabled");
+
+            builder.HasIndex(c => c.ExpiresAt)
+                   .HasDatabaseName("IX_CourseAccessCode_ExpiresAt");
+
+            builder.HasIndex(c => c.CreatedAt)
+                   .HasDatabaseName("IX_CourseAccessCode_CreatedAt");
         }
     }
 }
