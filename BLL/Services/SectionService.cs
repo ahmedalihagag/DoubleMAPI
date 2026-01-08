@@ -13,19 +13,23 @@ using System.Threading.Tasks;
 
 namespace BLL.Services
 {
-    // Section Service
     public class SectionService : ISectionService
     {
         private readonly IUnitOfWork _unitOfWork;
         private readonly ILogger<SectionService> _logger;
+        private readonly INotificationService _notificationService;
 
-        public SectionService(IUnitOfWork unitOfWork, ILogger<SectionService> logger)
+        public SectionService(
+            IUnitOfWork unitOfWork,
+            ILogger<SectionService> logger,
+            INotificationService notificationService)
         {
             _unitOfWork = unitOfWork;
             _logger = logger;
+            _notificationService = notificationService;
         }
 
-        public async Task<SectionDto> CreateAsync(CreateSectionDto dto)
+        public async Task<SectionDto> CreateSectionAsync(CreateSectionDto dto)
         {
             var id = await _unitOfWork.Sections.CreateAsync(
                 dto.CourseId,
@@ -33,6 +37,23 @@ namespace BLL.Services
                 dto.DisplayOrder);
 
             _logger.LogInformation("Created Section Id {Id}", id);
+
+            // ✅ Notify enrolled students about new section
+            var enrolledStudentIds = await _unitOfWork.CourseEnrollments
+                .GetEnrolledStudentIdsAsync(dto.CourseId);
+
+            foreach (var studentId in enrolledStudentIds)
+            {
+                await _notificationService.CreateNotificationAsync(
+                    studentId,
+                    "New Section Added",
+                    $"A new section '{dto.Title}' has been added to your course.",
+                    "NewSection"
+                );
+            }
+
+            _logger.LogInformation("Notified {Count} students about new section: {Title}",
+                enrolledStudentIds.Count(), dto.Title);
 
             return new SectionDto
             {
@@ -43,7 +64,7 @@ namespace BLL.Services
             };
         }
 
-        public async Task<bool> UpdateAsync(int sectionId, CreateSectionDto dto)
+        public async Task<bool> UpdateSectionAsync(int sectionId, CreateSectionDto dto)
         {
             var updated = await _unitOfWork.Sections.UpdateAsync(
                 sectionId,
@@ -52,19 +73,21 @@ namespace BLL.Services
 
             if (!updated)
                 _logger.LogWarning("Section {Id} not found for update", sectionId);
+
             return updated;
         }
 
-        public async Task<bool> DeleteAsync(int sectionId)
+        public async Task<bool> DeleteSectionAsync(int sectionId)
         {
             var deleted = await _unitOfWork.Sections.SoftDeleteAsync(sectionId);
 
             if (!deleted)
                 _logger.LogWarning("Section {Id} not found for delete", sectionId);
+
             return deleted;
         }
 
-        public async Task<SectionDto?> GetByIdAsync(int sectionId)
+        public async Task<SectionDto?> GetSectionByIdAsync(int sectionId)
         {
             var data = await _unitOfWork.Sections.GetByIdAsync(sectionId);
             if (data == null) return null;
@@ -78,10 +101,9 @@ namespace BLL.Services
             };
         }
 
-        public async Task<IEnumerable<SectionDto>> GetAllByCourseIdAsync(int courseId)
+        public async Task<IEnumerable<SectionDto>> GetSectionsByCourseAsync(int courseId)
         {
             var list = await _unitOfWork.Sections.GetAllByCourseIdAsync(courseId);
-
             return list.Select(s => new SectionDto
             {
                 Id = s.Id,

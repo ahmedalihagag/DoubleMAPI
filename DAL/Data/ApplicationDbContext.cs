@@ -39,6 +39,8 @@ namespace DAL.Data
         public DbSet<EmailLog> EmailLogs { get; set; }
         public DbSet<FileMetadata> FileMetadatas { get; set; }
         public DbSet<CourseAccessCode> CourseAccessCodes { get; set; }
+        public DbSet<UserToken> UserTokens { get; set; }
+        public DbSet<DeviceSession> DeviceSessions { get; set; }
 
 
         protected override void OnModelCreating(ModelBuilder builder)
@@ -66,7 +68,9 @@ namespace DAL.Data
             builder.ApplyConfiguration(new RefreshTokenConfiguration());
             builder.ApplyConfiguration(new EmailLogConfiguration());
             builder.ApplyConfiguration(new FileMetadataConfiguration());
-
+            builder.ApplyConfiguration(new CourseAccessCodeConfiguration());
+            builder.ApplyConfiguration(new UserTokenConfiguration());
+            builder.ApplyConfiguration(new DeviceSessionConfiguration());
 
             // Rename Identity tables (optional)
             builder.Entity<ApplicationUser>().ToTable("Users");

@@ -18,20 +18,20 @@ namespace BLL.DTOs.CourseDTOs
 
         public bool IsUsed { get; set; }
 
+        public DateTime? UsedAt { get; set; }
+
+        public string? UsedBy { get; set; }
+
         public bool IsDisabled { get; set; }
+
+        public DateTime? DisabledAt { get; set; }
+
+        public string CreatedBy { get; set; } = null!;
 
         public bool IsExpired { get; set; }
 
         public int DaysRemaining { get; set; }
 
-        public string CreatedBy { get; set; } = null!;
-
-        public string? UsedBy { get; set; }
-
-        public DateTime? UsedAt { get; set; }
-
-        public DateTime? DisabledAt { get; set; }
-
-        public string Status { get; set; } = "Valid"; // Valid, Expired, Used, Disabled
+        public string Status { get; set; } = string.Empty; // Valid, Used, Expired, Disabled
     }
 }

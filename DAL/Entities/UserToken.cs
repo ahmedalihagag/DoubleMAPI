@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using DAL.Enums;
 
 namespace DAL.Entities
 {
@@ -11,7 +12,7 @@ namespace DAL.Entities
         public int Id { get; set; }
         public int UserId { get; set; }
         public string Token { get; set; } = null!;
-        public string TokenType { get; set; } = null!; // "EmailConfirmation" or "PasswordReset"
+        public UserTokenType TokenType { get; set; }
         public DateTime Expiration { get; set; }
         public bool IsUsed { get; set; } = false;
     }

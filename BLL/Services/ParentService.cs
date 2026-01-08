@@ -14,17 +14,20 @@ using System.Threading.Tasks;
 
 namespace BLL.Services
 {
-    // Parent Service
     public class ParentService : IParentService
     {
-        private readonly IUnitOfWork _unitOfWork;
+        private readonly IUnitOfWork _uow;
         private readonly IMapper _mapper;
         private readonly IEmailService _emailService;
         private readonly ILogger<ParentService> _logger;
 
-        public ParentService(IUnitOfWork uow, IMapper mapper, IEmailService emailService, ILogger<ParentService> logger)
+        public ParentService(
+            IUnitOfWork uow,
+            IMapper mapper,
+            IEmailService emailService,
+            ILogger<ParentService> logger)
         {
-            _unitOfWork = uow;
+            _uow = uow;
             _mapper = mapper;
             _emailService = emailService;
             _logger = logger;
@@ -33,6 +36,7 @@ namespace BLL.Services
         public async Task<string> GenerateLinkCodeAsync(string studentId)
         {
             var code = Guid.NewGuid().ToString("N").Substring(0, 8).ToUpper();
+
             var linkCode = new ParentLinkCode
             {
                 Code = code,
@@ -40,34 +44,37 @@ namespace BLL.Services
                 ExpiresAt = DateTime.UtcNow.AddDays(1),
                 CreatedAt = DateTime.UtcNow
             };
-            await _unitOfWork.ParentLinkCodes.AddAsync(linkCode);
-            await _unitOfWork.SaveChangesAsync();
+
+            await _uow.ParentLinkCodes.AddAsync(linkCode);
+            await _uow.SaveChangesAsync();
+
             return code;
         }
 
         public async Task<bool> LinkParentToStudentAsync(string parentId, string code)
         {
-            await _unitOfWork.BeginTransactionAsync();
+            await _uow.BeginTransactionAsync();
+
             try
             {
-                var link = await _unitOfWork.ParentLinkCodes
+                var link = await _uow.ParentLinkCodes
                     .Query()
                     .FirstOrDefaultAsync(lc => lc.Code == code && !lc.IsUsed && lc.ExpiresAt > DateTime.UtcNow);
 
                 if (link == null)
                 {
-                    await _unitOfWork.RollbackTransactionAsync();
+                    await _uow.RollbackTransactionAsync();
                     return false;
                 }
 
-                var isLinked = await _unitOfWork.ParentStudents.IsLinkedAsync(parentId, link.StudentId);
+                var isLinked = await _uow.ParentStudents.IsLinkedAsync(parentId, link.StudentId);
                 if (isLinked)
                 {
-                    await _unitOfWork.RollbackTransactionAsync();
+                    await _uow.RollbackTransactionAsync();
                     return false;
                 }
 
-                await _unitOfWork.ParentStudents.AddAsync(new ParentStudent
+                await _uow.ParentStudents.AddAsync(new ParentStudent
                 {
                     ParentId = parentId,
                     StudentId = link.StudentId,
@@ -77,21 +84,21 @@ namespace BLL.Services
 
                 link.IsUsed = true;
                 link.UsedAt = DateTime.UtcNow;
-                _unitOfWork.ParentLinkCodes.Update(link);
+                _uow.ParentLinkCodes.Update(link);
 
-                await _unitOfWork.CommitTransactionAsync();
+                await _uow.CommitTransactionAsync();
                 return true;
             }
             catch
             {
-                await _unitOfWork.RollbackTransactionAsync();
+                await _uow.RollbackTransactionAsync();
                 throw;
             }
         }
 
         public async Task<List<StudentInfoDto>> GetLinkedStudentsAsync(string parentId)
         {
-            var links = await _unitOfWork.ParentStudents
+            var links = await _uow.ParentStudents
                 .Query()
                 .Include(ps => ps.Student)
                 .AsNoTracking()
@@ -105,6 +112,28 @@ namespace BLL.Services
                 Email = l.Student.Email ?? "",
                 LinkedAt = l.LinkedAt
             }).ToList();
+        }
+
+        // ✅ NEW METHOD: Check if parent is linked to student
+        public async Task<bool> IsLinkedAsync(string parentId, string studentId)
+        {
+            try
+            {
+                _logger.LogInformation("Checking if parent {ParentId} is linked to student {StudentId}",
+                    parentId, studentId);
+
+                var isLinked = await _uow.ParentStudents.IsLinkedAsync(parentId, studentId);
+
+                _logger.LogInformation("Parent {ParentId} link status with student {StudentId}: {IsLinked}",
+                    parentId, studentId, isLinked);
+
+                return isLinked;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking parent-student link");
+                throw;
+            }
         }
     }
 }

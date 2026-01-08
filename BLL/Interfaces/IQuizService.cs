@@ -17,5 +17,7 @@ namespace BLL.Interfaces
         Task<QuizAttemptDto> SubmitQuizAsync(int quizId, string studentId, Dictionary<int, int> answers);
         Task<PagedResult<QuizAttemptDto>> GetStudentAttemptsAsync(string studentId, PaginationParams paginationParams);
         Task<int> GetAttemptCountAsync(string studentId, int quizId);
+        Task<IEnumerable<QuizAttemptDto>> GetAttemptsByStudentAndQuizAsync(string studentId, int quizId);
+        Task<bool> DeleteAttemptAsync(int attemptId);
     }
 }

@@ -6,7 +6,6 @@ using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace DAL.Repositories
@@ -20,14 +19,15 @@ namespace DAL.Repositories
             _logger = Log.ForContext<LessonRepository>();
         }
 
-        #region CRUD with soft delete and logging
-
+        // Override to handle soft delete
         public override async Task<Lesson?> GetByIdAsync(int id)
         {
             try
             {
                 _logger.Debug("Getting Lesson by Id: {LessonId}", id);
-                return await _dbSet.AsNoTracking().FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
+                return await _dbSet
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(l => l.Id == id && !l.IsDeleted);
             }
             catch (Exception ex)
             {
@@ -41,40 +41,14 @@ namespace DAL.Repositories
             try
             {
                 _logger.Debug("Getting all Lessons");
-                return await _dbSet.AsNoTracking().Where(l => !l.IsDeleted).ToListAsync();
+                return await _dbSet
+                    .AsNoTracking()
+                    .Where(l => !l.IsDeleted)
+                    .ToListAsync();
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting all Lessons");
-                throw;
-            }
-        }
-
-        public override async Task AddAsync(Lesson entity)
-        {
-            try
-            {
-                _logger.Debug("Adding Lesson: {Title}", entity.Title);
-                await _dbSet.AddAsync(entity);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error adding Lesson: {Title}", entity.Title);
-                throw;
-            }
-        }
-
-        public override void Update(Lesson entity)
-        {
-            try
-            {
-                _logger.Debug("Updating Lesson: {LessonId}", entity.Id);
-                entity.UpdatedAt = DateTime.UtcNow;
-                _dbSet.Update(entity);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error updating Lesson: {LessonId}", entity.Id);
                 throw;
             }
         }
@@ -94,29 +68,6 @@ namespace DAL.Repositories
                 throw;
             }
         }
-
-        public override void DeleteRange(IEnumerable<Lesson> entities)
-        {
-            try
-            {
-                _logger.Debug("Soft deleting {Count} Lessons", entities?.Count() ?? 0);
-                foreach (var entity in entities)
-                {
-                    entity.IsDeleted = true;
-                    entity.UpdatedAt = DateTime.UtcNow;
-                }
-                _dbSet.UpdateRange(entities);
-            }
-            catch (Exception ex)
-            {
-                _logger.Error(ex, "Error soft deleting Lessons");
-                throw;
-            }
-        }
-
-        #endregion
-
-        #region Lesson-specific methods
 
         public async Task<Lesson?> GetLessonWithSectionsAsync(int lessonId)
         {
@@ -147,6 +98,24 @@ namespace DAL.Repositories
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting Lessons by CourseId: {CourseId}", courseId);
+                throw;
+            }
+        }
+
+        public async Task<IEnumerable<Lesson>> GetLessonsBySectionIdAsync(int sectionId)
+        {
+            try
+            {
+                _logger.Debug("Getting Lessons by SectionId: {SectionId}", sectionId);
+                return await _dbSet
+                    .AsNoTracking()
+                    .Where(l => l.SectionId == sectionId && !l.IsDeleted)
+                    .OrderBy(l => l.DisplayOrder)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error getting Lessons by SectionId: {SectionId}", sectionId);
                 throw;
             }
         }
@@ -182,7 +151,5 @@ namespace DAL.Repositories
                 throw;
             }
         }
-
-        #endregion
     }
 }

@@ -31,9 +31,11 @@ namespace DAL.Interfaces
         IEmailLogRepository EmailLogs { get; }
         IFileMetadataRepository FileMetadatas { get; }
         ICourseAccessCodeRepository CourseAccessCodes { get; }
+        IUserTokenRepository UserTokens { get; }
+        IDeviceSessionRepository DeviceSessions { get; }
 
 
-        
+
         //Identity Related
         UserManager<ApplicationUser> UserManager { get; }
         RoleManager<IdentityRole> RoleManager { get; }

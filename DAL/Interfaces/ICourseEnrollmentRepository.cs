@@ -14,6 +14,8 @@ namespace DAL.Interfaces
         Task<PagedResult<CourseEnrollment>> GetEnrollmentsByCoursePagedAsync(int courseId, PaginationParams paginationParams);
         Task<bool> IsStudentEnrolledAsync(string studentId, int courseId);
         Task<int> GetEnrollmentCountByCourseAsync(int courseId);
+        Task<IEnumerable<string>> GetEnrolledStudentIdsAsync(int courseId);
+
     }
 
 }

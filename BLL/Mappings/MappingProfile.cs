@@ -72,11 +72,11 @@ namespace BLL.Mappings
             CreateMap<CreateSectionDto, Section>();
 
             // Lesson Mappings
-            CreateMap<Lesson, LessonDto>()
-                .ForMember(dest => dest.IsCompleted, opt => opt.Ignore());
+            CreateMap<Lesson, LessonDto>();
 
             CreateMap<CreateLessonDto, Lesson>()
-                .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow));
+                .ForMember(dest => dest.CreatedAt, opt => opt.MapFrom(src => DateTime.UtcNow))
+                .ForMember(dest => dest.IsDeleted, opt => opt.MapFrom(src => false));
 
             // Enrollment Mappings
             CreateMap<CourseEnrollment, EnrollmentDto>()
@@ -127,6 +127,9 @@ namespace BLL.Mappings
             // File Metadata Mappings
             CreateMap<FileMetadata, FileUploadDto>()
                 .ForMember(dest => dest.Url, opt => opt.MapFrom(src => src.BunnyCdnUrl));
+
+            //Device Session Mappings
+            CreateMap<DeviceSession, DeviceSessionDto>().ReverseMap();
         }
     }
 }

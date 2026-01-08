@@ -1,4 +1,5 @@
-﻿using DAL.Data;
+﻿using BLL.Interfaces;
+using DAL.Data;
 using DAL.Entities;
 using DAL.Interfaces;
 using Microsoft.AspNetCore.Identity;
@@ -40,6 +41,8 @@ namespace DAL.Repositories
         public IEmailLogRepository EmailLogs { get; private set; }
         public IFileMetadataRepository FileMetadatas { get; private set; }
         public ICourseAccessCodeRepository CourseAccessCodes { get; private set; }
+        public IUserTokenRepository UserTokens { get; private set; }
+        public IDeviceSessionService DeviceSessions { get; private set; }
         public UserManager<ApplicationUser> UserManager { get; private set; }
         public RoleManager<IdentityRole> RoleManager { get; private set; }
 
@@ -69,6 +72,8 @@ namespace DAL.Repositories
             EmailLogs = new EmailLogRepository(_context);
             FileMetadatas = new FileMetadataRepository(_context);
             CourseAccessCodes = new CourseAccessCodeRepository(_context);
+            UserTokens = new UserTokenRepository(_context);
+            DeviceSessions = new DeviceSessionRepository(_context);
             UserManager = new UserManager<ApplicationUser>(
                 new UserStore<ApplicationUser>(_context),
                 null, // IOptions<IdentityOptions>

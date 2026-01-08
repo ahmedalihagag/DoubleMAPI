@@ -126,8 +126,11 @@ namespace BLL.Services
                 _logger.Information("Enrolling student {StudentId} using code: {Code}", studentId, courseCode);
 
                 // Find and validate course code
-                var code = await _unitOfWork.CourseCodes.FindAsync(c =>
-                    c.Code == courseCode && !c.IsUsed && c.ExpiresAt > DateTime.UtcNow);
+                var code = await _unitOfWork.CourseAccessCodes.FindAsync(c =>
+                    c.Code == courseCode &&
+                    !c.IsUsed &&
+                    !c.IsDisabled &&
+                    c.ExpiresAt > DateTime.UtcNow);
 
                 if (code == null)
                 {

@@ -83,5 +83,23 @@ namespace DAL.Repositories
                 throw;
             }
         }
+        public async Task<IEnumerable<string>> GetEnrolledStudentIdsAsync(int courseId)
+        {
+            try
+            {
+                _logger.Information("Getting enrolled student IDs for course: {CourseId}", courseId);
+
+                return await _dbSet
+                    .AsNoTracking()
+                    .Where(e => e.CourseId == courseId && e.IsActive)
+                    .Select(e => e.StudentId)
+                    .ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error getting enrolled student IDs for course: {CourseId}", courseId);
+                throw;
+            }
+        }
     }
 }

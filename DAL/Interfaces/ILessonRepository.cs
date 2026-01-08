@@ -15,5 +15,7 @@ namespace DAL.Interfaces
 
         Task<int> GetCompletedLessonsCountAsync(string studentId, int courseId);
         Task<bool> IsLessonCompletedAsync(string studentId, int lessonId);
+        Task<IEnumerable<Lesson>> GetLessonsBySectionIdAsync(int sectionId);
+
     }
 }

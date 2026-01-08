@@ -48,7 +48,8 @@ try
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-
+    //SignalR
+    builder.Services.AddSignalR();
 
     // Identity
     builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
@@ -197,6 +198,10 @@ try
             config
         );
     }
+
+    // Map SignalR Hubs
+    app.MapHub<NotificationHub>("/hubs/notification");
+
 
     app.Run();
 }

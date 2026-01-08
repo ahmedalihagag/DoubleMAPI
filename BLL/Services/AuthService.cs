@@ -2,11 +2,13 @@
 using BLL.DTOs;
 using BLL.DTOs.UserDTOs;
 using BLL.Interfaces;
+using DAL.Enums;
 using DAL.Interfaces;
 using Microsoft.AspNetCore.Identity;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Security.Claims;
 using System.Text;
 using System.Threading.Tasks;
@@ -19,6 +21,7 @@ namespace BLL.Services
         private readonly IEmailService _emailService;
         private readonly ITokenService _tokenService;
         private readonly IMapper _mapper;
+        private readonly IDeviceSessionService _deviceSessionService;
 
         public AuthService(
             IUnitOfWork uow,
@@ -78,23 +81,46 @@ namespace BLL.Services
         // -------------------------
         // Login
         // -------------------------
-        public async Task<AuthResponseDto> LoginAsync(LoginDto dto)
+        public async Task<AuthResponseDto> LoginAsync(
+        LoginDto dto,
+        string deviceId,
+        ClientType clientType,
+        string deviceInfo,
+        string ipAddress)
         {
+            // 1. Find user
             var user = await _uow.UserManager.FindByEmailAsync(dto.Email);
             if (user == null)
                 return new AuthResponseDto { IsSuccess = false, Message = "Invalid credentials" };
 
+            // 2. Check password
             if (!await _uow.UserManager.CheckPasswordAsync(user, dto.Password))
                 return new AuthResponseDto { IsSuccess = false, Message = "Invalid credentials" };
 
+            // 3. Check email confirmation
             if (!user.EmailConfirmed)
                 return new AuthResponseDto { IsSuccess = false, Message = "Email not confirmed" };
 
-            // Map user to DTO
+            // 4. Check device session (prevent multi-login if needed)
+            var existingSession = await _deviceSessionService.GetActiveSessionAsync(user.Id, clientType);
+
+            if (existingSession != null && existingSession.DeviceId != deviceId)
+            {
+                return new AuthResponseDto
+                {
+                    IsSuccess = false,
+                    Message = "Account already logged in on another device. Contact admin to reset."
+                };
+            }
+
+            // 5. Create / validate session
+            await _deviceSessionService.ValidateAndCreateSessionAsync(user.Id, deviceId, clientType, deviceInfo, ipAddress);
+
+            // 6. Map to DTO
             var userDto = _mapper.Map<UserDto>(user);
             userDto.Roles = (await _uow.UserManager.GetRolesAsync(user)).ToList();
 
-            // Generate tokens
+            // 7. Generate tokens
             var jwtToken = await _tokenService.GenerateJwtTokenAsync(userDto);
             var refreshToken = await _tokenService.GenerateRefreshTokenAsync(user.Id);
 
@@ -200,5 +226,61 @@ namespace BLL.Services
             var result = await _uow.UserManager.ResetPasswordAsync(user, dto.Token, dto.NewPassword);
             return result.Succeeded;
         }
+
+        //Biometric Login
+        public async Task<AuthResponseDto> BiometricLoginAsync(BiometricLoginDto dto)
+        {
+            // 1. Validate biometric token
+            var storedToken = await _uow.UserTokens.GetValidTokenAsync(dto.BiometricToken);
+
+            if (storedToken == null || storedToken.Expiration < DateTime.UtcNow)
+                return new AuthResponseDto
+                {
+                    IsSuccess = false,
+                    Message = "Invalid or expired biometric token"
+                };
+
+            // 2. Check device session
+            var session = await _deviceSessionService.GetActiveSessionAsync(
+                storedToken.UserId,
+                dto.ClientType,
+                dto.DeviceId);
+
+            if (session == null)
+                return new AuthResponseDto
+                {
+                    IsSuccess = false,
+                    Message = "Device not registered"
+                };
+
+            // 3. Load user
+            var user = await _uow.UserManager.FindByIdAsync(storedToken.UserId.ToString());
+            if (user == null)
+                return new AuthResponseDto
+                {
+                    IsSuccess = false,
+                    Message = "User not found"
+                };
+
+            // 4. Mark token as used
+            storedToken.IsUsed = true;
+            await _uow.SaveChangesAsync();
+
+            // 5. Generate tokens
+            var userDto = _mapper.Map<UserDto>(user);
+            userDto.Roles = (await _uow.UserManager.GetRolesAsync(user)).ToList();
+
+            var jwtToken = await _tokenService.GenerateJwtTokenAsync(userDto);
+            var refreshToken = await _tokenService.GenerateRefreshTokenAsync(user.Id);
+
+            return new AuthResponseDto
+            {
+                IsSuccess = true,
+                Token = jwtToken,
+                RefreshToken = refreshToken,
+                User = userDto
+            };
+        }
+
     }
 }

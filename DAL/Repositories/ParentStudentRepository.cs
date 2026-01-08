@@ -47,17 +47,22 @@ namespace DAL.Repositories
                 throw;
             }
         }
-
         public async Task<bool> IsLinkedAsync(string parentId, string studentId)
         {
             try
             {
+                _logger.Debug("Checking if parent {ParentId} is linked to student {StudentId}",
+                    parentId, studentId);
+
                 return await _dbSet.AnyAsync(ps =>
-                    ps.ParentId == parentId && ps.StudentId == studentId && ps.IsActive);
+                    ps.ParentId == parentId &&
+                    ps.StudentId == studentId &&
+                    ps.IsActive);
             }
             catch (Exception ex)
             {
-                _logger.Error(ex, "Error checking parent-student link");
+                _logger.Error(ex, "Error checking parent-student link for parent {ParentId} and student {StudentId}",
+                    parentId, studentId);
                 throw;
             }
         }
