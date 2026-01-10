@@ -16,7 +16,11 @@ public class NoCacheService : ICacheService
 
     public Task RemoveAsync(params string[] keys) => Task.CompletedTask;
 
+    public Task RemoveAsync(string key) => Task.CompletedTask;
+
     public Task ClearAsync() => Task.CompletedTask;
+
+    public Task ClearAllAsync() => Task.CompletedTask;
 
     public Task<bool> ExistsAsync(string key) => Task.FromResult(false);
 }
