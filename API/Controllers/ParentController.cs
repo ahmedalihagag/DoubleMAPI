@@ -1,10 +1,12 @@
 using BLL.DTOs.ParentStudentDTOs;
 using BLL.Interfaces;
+using DAL.Pagination;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace DoubleMAPI.Controllers
@@ -16,12 +18,17 @@ namespace DoubleMAPI.Controllers
     {
         private readonly IParentService _parentService;
         private readonly IProgressService _progressService;
+        private readonly IQuizService _quizService;
         private readonly ILogger _logger;
 
-        public ParentController(IParentService parentService, IProgressService progressService)
+        public ParentController(
+            IParentService parentService,
+            IProgressService progressService,
+            IQuizService quizService)
         {
             _parentService = parentService;
             _progressService = progressService;
+            _quizService = quizService;
             _logger = Log.ForContext<ParentController>();
         }
 
@@ -59,7 +66,7 @@ namespace DoubleMAPI.Controllers
 
             try
             {
-                var parentId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var parentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (string.IsNullOrEmpty(parentId))
                     return Unauthorized(new { success = false, message = "Parent ID not found" });
 
@@ -84,7 +91,7 @@ namespace DoubleMAPI.Controllers
         {
             try
             {
-                var parentId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var parentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (string.IsNullOrEmpty(parentId))
                     return Unauthorized(new { success = false, message = "Parent ID not found" });
 
@@ -106,19 +113,56 @@ namespace DoubleMAPI.Controllers
         {
             try
             {
-                var parentId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var parentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (string.IsNullOrEmpty(parentId))
                     return Unauthorized(new { success = false, message = "Parent ID not found" });
 
-                // Verify parent-student link
-                // TODO: Add verification logic
+                // ✅ Verify parent-student link
+                var isLinked = await _parentService.IsLinkedAsync(parentId, studentId);
+                if (!isLinked)
+                    return StatusCode(403, new { success = false, message = "Not linked to this student" });
 
-                // Get student progress
-                return Ok(new { success = true, message = "Progress retrieved", data = new { } });
+                // ✅ Get student progress
+                var progress = await _progressService.GetStudentProgressAsync(studentId);
+
+                return Ok(new { success = true, data = progress });
             }
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error getting student progress");
+                return StatusCode(500, new { success = false, message = "An error occurred" });
+            }
+        }
+
+        /// <summary>
+        /// Get student quiz attempts (Parents can see linked students' quiz results)
+        /// </summary>
+        [HttpGet("student/{studentId}/quiz-attempts")]
+        public async Task<ActionResult> GetStudentQuizAttempts(
+            string studentId,
+            [FromQuery] int pageNumber = 1,
+            [FromQuery] int pageSize = 10)
+        {
+            try
+            {
+                var parentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(parentId))
+                    return Unauthorized(new { success = false, message = "Parent ID not found" });
+
+                // ✅ Verify parent-student link
+                var isLinked = await _parentService.IsLinkedAsync(parentId, studentId);
+                if (!isLinked)
+                    return StatusCode(403, new { success = false, message = "Not linked to this student" });
+
+                // ✅ Get student quiz attempts
+                var paginationParams = new PaginationParams { PageNumber = pageNumber, PageSize = pageSize };
+                var attempts = await _quizService.GetStudentAttemptsAsync(studentId, paginationParams);
+
+                return Ok(new { success = true, data = attempts });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error getting student quiz attempts");
                 return StatusCode(500, new { success = false, message = "An error occurred" });
             }
         }

@@ -1,6 +1,5 @@
-﻿using BLL.DTOs.CourseDTOs;
+using BLL.DTOs.CourseDTOs;
 using BLL.Interfaces;
-using DAL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PdfSharp.Drawing;
@@ -10,8 +9,6 @@ using System;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using System.Xml.Linq;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace DoubleMAPI.Controllers
 {
@@ -21,12 +18,13 @@ namespace DoubleMAPI.Controllers
     public class AdminController : ControllerBase
     {
         private readonly ICourseAccessCodeService _codeService;
-        private readonly Serilog.ILogger _logger;
         private readonly IDeviceSessionService _deviceSessionService;
+        private readonly ILogger _logger;
 
-        public AdminController(ICourseAccessCodeService codeService)
+        public AdminController(ICourseAccessCodeService codeService, IDeviceSessionService deviceSessionService)
         {
             _codeService = codeService;
+            _deviceSessionService = deviceSessionService ?? throw new ArgumentNullException(nameof(deviceSessionService));
             _logger = Log.ForContext<AdminController>();
         }
 
@@ -43,7 +41,7 @@ namespace DoubleMAPI.Controllers
 
             try
             {
-                var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (string.IsNullOrEmpty(adminId))
                     return Unauthorized(new { success = false, message = "Admin ID not found" });
 
@@ -68,24 +66,33 @@ namespace DoubleMAPI.Controllers
         [HttpGet("courses/{courseId}/export-codes")]
         public async Task<IActionResult> ExportCodesToPdf(int courseId)
         {
-            var codes = await _codeService.GetCourseCodesPagedAsync(courseId, 1, 1000);
-
-            using var ms = new MemoryStream();
-            using var document = new PdfDocument();
-            var page = document.AddPage();
-            var gfx = XGraphics.FromPdfPage(page);
-            var font = new XFont("Arial", 12);
-
-            int y = 40;
-            foreach (var code in codes)
+            try
             {
-                gfx.DrawString($"Code: {code.Code} | Expires: {code.ExpiresAt:yyyy-MM-dd}",
-                    font, XBrushes.Black, new XRect(40, y, page.Width, page.Height), XStringFormats.TopLeft);
-                y += 20;
-            }
+                var codes = await _codeService.GetCourseCodesPagedAsync(courseId, 1, 1000);
 
-            document.Save(ms);
-            return File(ms.ToArray(), "application/pdf", $"CourseCodes_{courseId}.pdf");
+                using var ms = new MemoryStream();
+                using var document = new PdfDocument();
+                var page = document.AddPage();
+                var gfx = XGraphics.FromPdfPage(page);
+                var font = new XFont("Arial", 12);
+
+                int y = 40;
+                foreach (var code in codes)
+                {
+                    gfx.DrawString($"Code: {code.Code} | Expires: {code.ExpiresAt:yyyy-MM-dd}",
+                        font, XBrushes.Black, new XRect(40, y, page.Width, page.Height), XStringFormats.TopLeft);
+                    y += 20;
+                }
+
+                document.Save(ms);
+                _logger.Information("Exported codes for course {CourseId} to PDF", courseId);
+                return File(ms.ToArray(), "application/pdf", $"CourseCodes_{courseId}.pdf");
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error exporting codes to PDF");
+                return StatusCode(500, new { success = false, message = "An error occurred" });
+            }
         }
 
         /// <summary>
@@ -96,7 +103,7 @@ namespace DoubleMAPI.Controllers
         {
             try
             {
-                var adminId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
                 if (string.IsNullOrEmpty(adminId))
                     return Unauthorized(new { success = false, message = "Admin ID not found" });
 
@@ -134,17 +141,30 @@ namespace DoubleMAPI.Controllers
             }
         }
 
-        [HttpPost("admin/reset-device/{userId}")]
-        [Authorize(Policy = "AdminOnly")]
+        /// <summary>
+        /// Reset user device sessions (admin only)
+        /// </summary>
+        [HttpPost("users/{userId}/reset-device")]
         public async Task<IActionResult> ResetUserDevice(string userId)
         {
-            var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var success = await _deviceSessionService.AdminResetDeviceAsync(userId, adminId);
+            try
+            {
+                var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(adminId))
+                    return Unauthorized(new { success = false, message = "Admin ID not found" });
 
-            if (!success)
-                return NotFound(new { success = false, message = "User not found" });
+                var success = await _deviceSessionService.AdminResetDeviceAsync(userId, adminId);
+                if (!success)
+                    return NotFound(new { success = false, message = "User not found" });
 
-            return Ok(new { success = true, message = "Device sessions reset successfully" });
+                _logger.Information("Admin {AdminId} reset device sessions for user {UserId}", adminId, userId);
+                return Ok(new { success = true, message = "Device sessions reset successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error resetting device sessions for user {UserId}", userId);
+                return StatusCode(500, new { success = false, message = "An error occurred" });
+            }
         }
     }
 }

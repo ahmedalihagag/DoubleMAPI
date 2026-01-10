@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using BLL.Interfaces;
 using BLL.Mappings;
 using BLL.Seeder;
@@ -15,8 +15,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using System.Net;
-using System.Net.Mail;
+using StackExchange.Redis;
 using System.Text;
 
 // Configure Serilog
@@ -46,9 +45,32 @@ try
 
     // Database
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-    //SignalR
+    // Redis Cache
+    var redisConnection = builder.Configuration.GetConnectionString("RedisConnection");
+    if (!string.IsNullOrWhiteSpace(redisConnection))
+    {
+        try
+        {
+            var redis = ConnectionMultiplexer.Connect(redisConnection);
+            builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
+            builder.Services.AddScoped<ICacheService, CacheService>();
+            Log.Information("Redis cache configured successfully");
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "Failed to connect to Redis. Caching will be disabled.");
+            builder.Services.AddScoped<ICacheService, NoCacheService>();
+        }
+    }
+    else
+    {
+        Log.Warning("Redis connection string not configured. Caching disabled.");
+        builder.Services.AddScoped<ICacheService, NoCacheService>();
+    }
+
+    // SignalR
     builder.Services.AddSignalR();
 
     // Identity
@@ -60,7 +82,7 @@ try
         options.Password.RequireNonAlphanumeric = true;
         options.Password.RequiredLength = 8;
         options.User.RequireUniqueEmail = true;
-        options.SignIn.RequireConfirmedEmail = false; // Set true in production
+        options.SignIn.RequireConfirmedEmail = false;
     })
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddDefaultTokenProviders();
@@ -100,6 +122,12 @@ try
 
     // Register Unit of Work & Services
     builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+    // BLL Services
+    builder.Services.AddScoped<IAuthService, AuthService>();
+    builder.Services.AddScoped<ITokenService, TokenService>();
+    builder.Services.AddScoped<IDeviceSessionService, DeviceSessionService>();
+    builder.Services.AddScoped<IAdminUserService, AdminUserService>();
     builder.Services.AddScoped<ICourseService, CourseService>();
     builder.Services.AddScoped<IEnrollmentService, EnrollmentService>();
     builder.Services.AddScoped<IQuizService, QuizService>();
@@ -111,8 +139,8 @@ try
     builder.Services.AddScoped<ICourseCodeService, CourseCodeService>();
     builder.Services.AddScoped<ICourseAccessCodeService, CourseAccessCodeService>();
     builder.Services.AddScoped<IFileService, FileService>();
-    builder.Services.AddScoped<IAuthService, AuthService>();
-    builder.Services.AddScoped<ITokenService, TokenService>();
+    // ✅ NEW: Register TeacherService
+    builder.Services.AddScoped<ITeacherService, TeacherService>();
 
     // Infrastructure Services
     builder.Services.AddScoped<IEmailService, FluentEmailService>();
@@ -133,7 +161,6 @@ try
             Description = "Double M Educational Platform API"
         });
 
-        // JWT for Swagger
         c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
         {
             Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
@@ -166,7 +193,8 @@ try
         {
             policy.AllowAnyOrigin()
                   .AllowAnyMethod()
-                  .AllowAnyHeader();
+                  .AllowAnyHeader()
+                  .AllowCredentials();  // ✅ ADDED: Required for SignalR
         });
     });
 
@@ -199,9 +227,8 @@ try
         );
     }
 
-    // Map SignalR Hubs
+    // ✅ FIXED: Map SignalR Hubs (must come after authorization)
     app.MapHub<NotificationHub>("/hubs/notification");
-
 
     app.Run();
 }

@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+using System;
 using System.ComponentModel.DataAnnotations;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BLL.DTOs.CourseDTOs
 {
@@ -19,14 +15,18 @@ namespace BLL.DTOs.CourseDTOs
         [StringLength(500)]
         public string? ImageUrl { get; set; }
 
-        [StringLength(50)]
+        [StringLength(100)]
         public string? Category { get; set; }
 
         [StringLength(50)]
-        public string? Level { get; set; } // Beginner, Intermediate, Advanced
+        public string? Level { get; set; }
 
+        [Range(1, 1000)]
         public int? DurationHours { get; set; }
 
         public bool IsPublished { get; set; } = false;
+
+        [StringLength(100)]
+        public string? TeacherId { get; set; }
     }
 }

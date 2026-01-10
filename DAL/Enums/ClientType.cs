@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,6 +10,6 @@ namespace DAL.Enums
     {
         Web = 1,
         Android = 2,
-        IOS = 3
+        iOS = 3
     }
 }

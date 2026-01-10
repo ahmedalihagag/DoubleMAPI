@@ -33,7 +33,9 @@ namespace DAL.Entities
 
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-        public DateTime? LastAccessAt { get; set; }
+        public DateTime LastActivityAt { get; set; } = DateTime.UtcNow;
+
+        public DateTime ExpiresAt { get; set; }
 
         public DateTime? DeactivatedAt { get; set; }
 

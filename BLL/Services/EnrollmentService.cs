@@ -1,4 +1,4 @@
-﻿using AutoMapper;
+using AutoMapper;
 using BLL.DTOs.EnrollmentDTOs;
 using BLL.Interfaces;
 using DAL.Entities;
@@ -117,6 +117,9 @@ namespace BLL.Services
             }
         }
 
+        /// <summary>
+        /// ✅ FIXED: Enroll student using CourseAccessCode (not CourseCode)
+        /// </summary>
         public async Task<bool> EnrollStudentByCodeAsync(string studentId, string courseCode)
         {
             await _unitOfWork.BeginTransactionAsync();
@@ -125,12 +128,13 @@ namespace BLL.Services
             {
                 _logger.Information("Enrolling student {StudentId} using code: {Code}", studentId, courseCode);
 
-                // Find and validate course code
+                // ✅ FIXED: Use CourseAccessCodes repository (correct one)
+                var now = DateTime.UtcNow;
                 var code = await _unitOfWork.CourseAccessCodes.FindAsync(c =>
                     c.Code == courseCode &&
                     !c.IsUsed &&
                     !c.IsDisabled &&
-                    c.ExpiresAt > DateTime.UtcNow);
+                    c.ExpiresAt > now);
 
                 if (code == null)
                 {
@@ -148,7 +152,7 @@ namespace BLL.Services
                     code.IsUsed = true;
                     code.UsedAt = DateTime.UtcNow;
                     code.UsedBy = studentId;
-                    _unitOfWork.CourseCodes.Update(code);
+                    _unitOfWork.CourseAccessCodes.Update(code);
 
                     await _unitOfWork.CommitTransactionAsync();
                     _logger.Information("Student {StudentId} enrolled successfully using code: {Code}", studentId, courseCode);

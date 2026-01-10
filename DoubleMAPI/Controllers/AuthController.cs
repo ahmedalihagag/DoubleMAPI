@@ -1,4 +1,4 @@
-﻿using BLL.DTOs;
+using BLL.DTOs;
 using BLL.DTOs.UserDTOs;
 using BLL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -47,7 +47,7 @@ namespace DoubleMAPI.Controllers
         }
 
         /// <summary>
-        /// Login user
+        /// Login user with device information
         /// </summary>
         [HttpPost("login")]
         public async Task<ActionResult<AuthResponseDto>> Login([FromBody] LoginDto dto)
@@ -57,7 +57,13 @@ namespace DoubleMAPI.Controllers
 
             try
             {
-                var result = await _authService.LoginAsync(dto);
+                var deviceId = Request.Headers["X-Device-Id"].ToString() ?? Guid.NewGuid().ToString();
+                var clientType = Enum.Parse<DAL.Enums.ClientType>(
+                    Request.Headers["X-Client-Type"].ToString() ?? "Web");
+                var deviceInfo = Request.Headers["X-Device-Info"].ToString() ?? "";
+                var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "";
+
+                var result = await _authService.LoginAsync(dto, deviceId, clientType, deviceInfo, ipAddress);
                 if (!result.IsSuccess)
                     return Unauthorized(new { success = false, message = result.Message });
 
@@ -143,7 +149,7 @@ namespace DoubleMAPI.Controllers
         /// </summary>
         [HttpPost("change-password")]
         [Authorize]
-        public async Task<IActionResult> ChangePassword([FromBody] string user_Id, [FromBody]string currentPassword,[FromBody] string newPassword)
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid input" });
@@ -154,7 +160,7 @@ namespace DoubleMAPI.Controllers
                 if (string.IsNullOrEmpty(userId))
                     return Unauthorized(new { success = false, message = "User ID not found" });
 
-                var success = await _authService.ChangePasswordAsync(userId, currentPassword, newPassword);
+                var success = await _authService.ChangePasswordAsync(userId, dto.CurrentPassword, dto.NewPassword);
                 if (!success)
                     return BadRequest(new { success = false, message = "Password change failed" });
 
@@ -179,7 +185,6 @@ namespace DoubleMAPI.Controllers
             try
             {
                 await _authService.SendPasswordResetAsync(dto);
-                // Don't reveal if email exists
                 return Ok(new { success = true, message = "If email exists, password reset link sent" });
             }
             catch (Exception ex)
@@ -209,6 +214,30 @@ namespace DoubleMAPI.Controllers
             catch (Exception ex)
             {
                 _logger.Error(ex, "Error resetting password");
+                return StatusCode(500, new { success = false, message = "An error occurred" });
+            }
+        }
+
+        /// <summary>
+        /// Biometric login
+        /// </summary>
+        [HttpPost("biometric-login")]
+        public async Task<ActionResult<AuthResponseDto>> BiometricLogin([FromBody] BiometricLoginDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { success = false, message = "Invalid input" });
+
+            try
+            {
+                var result = await _authService.BiometricLoginAsync(dto);
+                if (!result.IsSuccess)
+                    return Unauthorized(new { success = false, message = result.Message });
+
+                return Ok(new { success = true, data = result });
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error during biometric login");
                 return StatusCode(500, new { success = false, message = "An error occurred" });
             }
         }

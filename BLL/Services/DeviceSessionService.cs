@@ -1,8 +1,8 @@
-﻿using DAL.Data;
+using BLL.Interfaces;
 using DAL.Entities;
 using DAL.Enums;
 using DAL.Interfaces;
-using Microsoft.EntityFrameworkCore;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,170 +13,158 @@ namespace BLL.Services
 {
     public class DeviceSessionService : IDeviceSessionService
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IUnitOfWork _unitOfWork;
+        private readonly ILogger _logger;
 
-        public DeviceSessionService(ApplicationDbContext context)
+        public DeviceSessionService(IUnitOfWork unitOfWork)
         {
-            _context = context;
+            _unitOfWork = unitOfWork;
+            _logger = Log.ForContext<DeviceSessionService>();
         }
 
-        // -------------------------
-        // Validate and create a session
-        // Ensures only 1 active session per client type
-        // -------------------------
-        public async Task<bool> ValidateAndCreateSessionAsync(
+        public async Task<DeviceSession?> GetActiveSessionAsync(string userId, ClientType clientType, string? deviceId = null)
+        {
+            try
+            {
+                _logger.Debug("Retrieving active session for user {UserId}, client type {ClientType}", userId, clientType);
+
+                var sessions = await _unitOfWork.DeviceSessions.FindAsync(s =>
+                    s.UserId == userId &&
+                    s.ClientType == clientType &&
+                    s.IsActive &&
+                    s.ExpiresAt > DateTime.UtcNow);
+
+                if (deviceId != null)
+                    return sessions.FirstOrDefault(s => s.DeviceId == deviceId);
+
+                return sessions.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error getting active session");
+                throw;
+            }
+        }
+
+        public async Task<DeviceSession> ValidateAndCreateSessionAsync(
             string userId,
             string deviceId,
             ClientType clientType,
             string deviceInfo,
             string ipAddress)
         {
-            // Deactivate any existing active session for this client type
-            var existingSession = await _context.DeviceSessions
-                .FirstOrDefaultAsync(s =>
+            try
+            {
+                _logger.Information("Creating device session for user {UserId}, device {DeviceId}", userId, deviceId);
+
+                var existingSession = await _unitOfWork.DeviceSessions.FindAsync(s =>
                     s.UserId == userId &&
-                    s.ClientType == clientType &&
-                    s.IsActive);
-
-            if (existingSession != null)
-            {
-                existingSession.IsActive = false;
-                existingSession.LogoutAt = DateTime.UtcNow;
-            }
-
-            // Create new session
-            var newSession = new DeviceSession
-            {
-                UserId = userId,
-                DeviceId = deviceId,
-                ClientType = clientType,
-                DeviceInfo = deviceInfo,
-                IPAddress = ipAddress,
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow
-            };
-
-            await _context.DeviceSessions.AddAsync(newSession);
-            await _context.SaveChangesAsync();
-
-            return true;
-        }
-
-        // -------------------------
-        // Get active session for a specific user, client type, and device
-        // -------------------------
-        public async Task<DeviceSession?> GetActiveSessionAsync(int userId, ClientType clientType, string deviceId)
-        {
-            return await _context.DeviceSessions
-                .Where(s =>
-                    s.UserId == userId.ToString() &&
-                    s.ClientType == clientType &&
                     s.DeviceId == deviceId &&
-                    s.IsActive)
-                .FirstOrDefaultAsync();
+                    s.ClientType == clientType);
+
+                DeviceSession session;
+
+                if (existingSession != null)
+                {
+                    existingSession.LastActivityAt = DateTime.UtcNow;
+                    existingSession.ExpiresAt = DateTime.UtcNow.AddDays(30);
+                    existingSession.IsActive = true;
+                    _unitOfWork.DeviceSessions.Update(existingSession);
+                    session = existingSession;
+                }
+                else
+                {
+                    session = new DeviceSession
+                    {
+                        UserId = userId,
+                        DeviceId = deviceId,
+                        ClientType = clientType,
+                        DeviceInfo = deviceInfo,
+                        IpAddress = ipAddress,
+                        CreatedAt = DateTime.UtcNow,
+                        LastActivityAt = DateTime.UtcNow,
+                        ExpiresAt = DateTime.UtcNow.AddDays(30),
+                        IsActive = true
+                    };
+
+                    await _unitOfWork.DeviceSessions.AddAsync(session);
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+                _logger.Information("Device session created/updated for user {UserId}", userId);
+
+                return session;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error creating device session");
+                throw;
+            }
         }
 
-        // -------------------------
-        // Get all sessions for a user
-        // -------------------------
-        public async Task<List<DeviceSession>> GetUserSessionsAsync(string userId)
+        public async Task<bool> InvalidateSessionAsync(string userId, string deviceId)
         {
-            return await _context.DeviceSessions
-                .Where(s => s.UserId == userId)
-                .ToListAsync();
+            try
+            {
+                _logger.Information("Invalidating session for user {UserId}, device {DeviceId}", userId, deviceId);
+
+                var session = await _unitOfWork.DeviceSessions.FindAsync(s =>
+                    s.UserId == userId && s.DeviceId == deviceId && s.IsActive);
+
+                if (session == null)
+                    return false;
+
+                session.IsActive = false;
+                _unitOfWork.DeviceSessions.Update(session);
+                await _unitOfWork.SaveChangesAsync();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error invalidating session");
+                throw;
+            }
         }
 
-        // -------------------------
-        // Check if a device is allowed to log in
-        // -------------------------
-        public async Task<bool> IsDeviceAllowedAsync(string userId, string deviceId, ClientType clientType)
-        {
-            var activeSession = await _context.DeviceSessions
-                .FirstOrDefaultAsync(s =>
-                    s.UserId == userId &&
-                    s.ClientType == clientType &&
-                    s.IsActive);
-
-            if (activeSession == null) return true;
-
-            return activeSession.DeviceId == deviceId;
-        }
-
-        // -------------------------
-        // Admin can reset all active sessions for a user
-        // -------------------------
         public async Task<bool> AdminResetDeviceAsync(string userId, string adminId)
         {
-            var sessions = await _context.DeviceSessions
-                .Where(s => s.UserId == userId && s.IsActive)
-                .ToListAsync();
-
-            foreach (var session in sessions)
+            try
             {
-                session.IsActive = false;
-                session.LogoutAt = DateTime.UtcNow;
-                session.DeactivatedByAdminId = adminId;
+                _logger.Warning("Admin {AdminId} resetting device sessions for user {UserId}", adminId, userId);
+
+                var sessions = await _unitOfWork.DeviceSessions.FindAsync(s =>
+                    s.UserId == userId && s.IsActive);
+
+                foreach (var session in sessions)
+                {
+                    session.IsActive = false;
+                    _unitOfWork.DeviceSessions.Update(session);
+                }
+
+                await _unitOfWork.SaveChangesAsync();
+                return true;
             }
-
-            await _context.SaveChangesAsync();
-            return true;
-        }
-
-        // -------------------------
-        // Deactivate a session by client type
-        // -------------------------
-        public async Task DeactivateSessionAsync(string userId, ClientType clientType)
-        {
-            var sessions = await _context.DeviceSessions
-                .Where(s => s.UserId == userId && s.ClientType == clientType && s.IsActive)
-                .ToListAsync();
-
-            foreach (var session in sessions)
+            catch (Exception ex)
             {
-                session.IsActive = false;
-                session.LogoutAt = DateTime.UtcNow;
+                _logger.Error(ex, "Error resetting user devices");
+                throw;
             }
-
-            await _context.SaveChangesAsync();
         }
 
-        // -------------------------
-        // ------------------------- IRepository<DeviceSession> Methods -------------------------
-        // -------------------------
-
-        public async Task<DeviceSession> AddAsync(DeviceSession entity)
+        public async Task<IEnumerable<DeviceSession>> GetUserSessionsAsync(string userId)
         {
-            await _context.DeviceSessions.AddAsync(entity);
-            await _context.SaveChangesAsync();
-            return entity;
-        }
-
-        public async Task UpdateAsync(DeviceSession entity)
-        {
-            _context.DeviceSessions.Update(entity);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task DeleteAsync(DeviceSession entity)
-        {
-            _context.DeviceSessions.Remove(entity);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task<DeviceSession?> GetByIdAsync(int id)
-        {
-            return await _context.DeviceSessions.FindAsync(id);
-        }
-
-        public async Task<List<DeviceSession>> GetAllAsync()
-        {
-            return await _context.DeviceSessions.ToListAsync();
-        }
-
-        public async Task<IEnumerable<DeviceSession>> FindAsync(Func<DeviceSession, bool> predicate)
-        {
-            // In-memory filtering (OK for small datasets)
-            return _context.DeviceSessions.AsEnumerable().Where(predicate);
+            try
+            {
+                _logger.Debug("Getting all sessions for user {UserId}", userId);
+                return await _unitOfWork.DeviceSessions.FindAsync(s =>
+                    s.UserId == userId && s.IsActive && s.ExpiresAt > DateTime.UtcNow);
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error getting user sessions");
+                throw;
+            }
         }
     }
 }

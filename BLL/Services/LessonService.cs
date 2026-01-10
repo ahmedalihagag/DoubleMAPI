@@ -1,9 +1,11 @@
-﻿using AutoMapper;
+using AutoMapper;
 using BLL.DTOs.LessonDTOs;
 using BLL.Interfaces;
 using DAL.Interfaces;
 using Microsoft.Extensions.Logging;
+using Serilog;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -15,39 +17,37 @@ namespace BLL.Services
         private readonly IMapper _mapper;
         private readonly ILogger<LessonService> _logger;
         private readonly INotificationService _notificationService;
+        private readonly IProgressService _progressService;
 
         public LessonService(
             IUnitOfWork unitOfWork,
             IMapper mapper,
             ILogger<LessonService> logger,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            IProgressService progressService)
         {
             _unitOfWork = unitOfWork;
             _mapper = mapper;
             _logger = logger;
             _notificationService = notificationService;
+            _progressService = progressService;
         }
 
         public async Task<LessonDto> CreateLessonAsync(CreateLessonDto createLessonDto)
         {
             _logger.LogInformation("Creating lesson: {Title}", createLessonDto.Title);
 
-            // ✅ Map DTO to Entity in BLL
             var lesson = _mapper.Map<DAL.Entities.Lesson>(createLessonDto);
 
-            // ✅ Use UnitOfWork to add entity
             await _unitOfWork.Lessons.AddAsync(lesson);
             await _unitOfWork.SaveChangesAsync();
 
-            // ✅ Get section info to find course ID
             var section = await _unitOfWork.Sections.GetByIdAsync(createLessonDto.SectionId);
             if (section.HasValue)
             {
-                // ✅ Get enrolled student IDs (primitives, not entities)
                 var enrolledStudentIds = await _unitOfWork.CourseEnrollments
                     .GetEnrolledStudentIdsAsync(section.Value.CourseId);
 
-                // ✅ Create notifications for each student
                 foreach (var studentId in enrolledStudentIds)
                 {
                     await _notificationService.CreateNotificationAsync(
@@ -62,26 +62,44 @@ namespace BLL.Services
                     enrolledStudentIds.Count(), lesson.Title);
             }
 
-            // ✅ Map entity back to DTO in BLL
             return _mapper.Map<LessonDto>(lesson);
         }
 
         public async Task<LessonDto?> GetLessonByIdAsync(int lessonId)
         {
-            // ✅ Get entity from DAL
             var lesson = await _unitOfWork.Lessons.GetByIdAsync(lessonId);
-
-            // ✅ Map to DTO in BLL
             return lesson == null ? null : _mapper.Map<LessonDto>(lesson);
+        }
+
+        public async Task<List<LessonDto>> GetLessonsBySectionAsync(int sectionId)
+        {
+            try
+            {
+                _logger.LogDebug("Getting lessons for section: {SectionId}", sectionId);
+
+                var lessons = await _unitOfWork.Lessons.GetLessonsBySectionIdAsync(sectionId);
+
+                var dtos = lessons
+                    .Select(l => _mapper.Map<LessonDto>(l))
+                    .ToList();
+
+                _logger.LogInformation("Retrieved {Count} lessons for section: {SectionId}",
+                    dtos.Count, sectionId);
+
+                return dtos;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting lessons for section: {SectionId}", sectionId);
+                throw;
+            }
         }
 
         public async Task<bool> UpdateLessonAsync(int lessonId, CreateLessonDto updateDto)
         {
-            // ✅ Get entity from DAL
             var lesson = await _unitOfWork.Lessons.GetByIdAsync(lessonId);
             if (lesson == null) return false;
 
-            // ✅ Update entity properties in BLL
             lesson.Title = updateDto.Title;
             lesson.VideoUrl = updateDto.VideoUrl;
             lesson.MaterialUrl = updateDto.MaterialUrl;
@@ -90,7 +108,6 @@ namespace BLL.Services
             lesson.DurationMinutes = updateDto.DurationMinutes;
             lesson.UpdatedAt = DateTime.UtcNow;
 
-            // ✅ Use UnitOfWork to update
             _unitOfWork.Lessons.Update(lesson);
             await _unitOfWork.SaveChangesAsync();
 
@@ -99,19 +116,21 @@ namespace BLL.Services
 
         public async Task<bool> DeleteLessonAsync(int lessonId)
         {
-            // ✅ Get entity from DAL
             var lesson = await _unitOfWork.Lessons.GetByIdAsync(lessonId);
             if (lesson == null) return false;
 
-            // ✅ Soft delete in BLL
             lesson.IsDeleted = true;
             lesson.UpdatedAt = DateTime.UtcNow;
 
-            // ✅ Use UnitOfWork to update
             _unitOfWork.Lessons.Update(lesson);
             await _unitOfWork.SaveChangesAsync();
 
             return true;
+        }
+
+        public async Task<bool> MarkLessonCompleteAsync(string studentId, int lessonId)
+        {
+            return await _progressService.MarkLessonCompleteAsync(studentId, lessonId);
         }
     }
 }

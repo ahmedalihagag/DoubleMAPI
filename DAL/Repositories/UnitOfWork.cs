@@ -1,4 +1,3 @@
-﻿using BLL.Interfaces;
 using DAL.Data;
 using DAL.Entities;
 using DAL.Interfaces;
@@ -42,7 +41,7 @@ namespace DAL.Repositories
         public IFileMetadataRepository FileMetadatas { get; private set; }
         public ICourseAccessCodeRepository CourseAccessCodes { get; private set; }
         public IUserTokenRepository UserTokens { get; private set; }
-        public IDeviceSessionService DeviceSessions { get; private set; }
+        public IDeviceSessionRepository DeviceSessions { get; private set; }
         public UserManager<ApplicationUser> UserManager { get; private set; }
         public RoleManager<IdentityRole> RoleManager { get; private set; }
 
@@ -76,14 +75,14 @@ namespace DAL.Repositories
             DeviceSessions = new DeviceSessionRepository(_context);
             UserManager = new UserManager<ApplicationUser>(
                 new UserStore<ApplicationUser>(_context),
-                null, // IOptions<IdentityOptions>
+                null,
                 new PasswordHasher<ApplicationUser>(),
-                null, // IEnumerable<IUserValidator<ApplicationUser>>
-                null, // IEnumerable<IPasswordValidator<ApplicationUser>>
-                null, // ILookupNormalizer
-                null, // IdentityErrorDescriber
-                null, // IServiceProvider
-                null  // ILogger<UserManager<ApplicationUser>>
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
             );
         }
 

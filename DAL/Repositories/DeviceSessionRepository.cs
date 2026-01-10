@@ -1,57 +1,51 @@
-﻿using DAL.Data;
+using DAL.Data;
 using DAL.Entities;
 using DAL.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace DAL.Repositories
 {
-    public class DeviceSessionRepository : IDeviceSessionRepository
+    public class DeviceSessionRepository : Repository<DeviceSession>, IDeviceSessionRepository
     {
-        private readonly ApplicationDbContext _context;
+        private readonly ILogger _logger;
 
-        public DeviceSessionRepository(ApplicationDbContext context)
+        public DeviceSessionRepository(ApplicationDbContext context) : base(context)
         {
-            _context = context;
-        }
-
-        public async Task<DeviceSession> AddAsync(DeviceSession entity)
-        {
-            await _context.DeviceSessions.AddAsync(entity);
-            await _context.SaveChangesAsync();
-            return entity;
-        }
-
-        public async Task DeleteAsync(DeviceSession entity)
-        {
-            _context.DeviceSessions.Remove(entity);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task<List<DeviceSession>> GetAllAsync()
-        {
-            return await _context.DeviceSessions.ToListAsync();
-        }
-
-        public async Task<DeviceSession?> GetByIdAsync(int id)
-        {
-            return await _context.DeviceSessions.FindAsync(id);
+            _logger = Log.ForContext<DeviceSessionRepository>();
         }
 
         public async Task<IEnumerable<DeviceSession>> FindAsync(Expression<Func<DeviceSession, bool>> predicate)
         {
-            return await _context.DeviceSessions.Where(predicate).ToListAsync();
+            try
+            {
+                _logger.Debug("Finding device sessions with predicate");
+                return await _dbSet.Where(predicate).ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error finding device sessions");
+                throw;
+            }
         }
 
-        public async Task<DeviceSession> UpdateAsync(DeviceSession entity)
+        public async Task<IEnumerable<DeviceSession>> FindAllAsync(Expression<Func<DeviceSession, bool>> predicate)
         {
-            _context.DeviceSessions.Update(entity);
-            await _context.SaveChangesAsync();
-            return entity;
+            try
+            {
+                _logger.Debug("Finding all device sessions with predicate");
+                return await _dbSet.Where(predicate).ToListAsync();
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error finding all device sessions");
+                throw;
+            }
         }
     }
 }
