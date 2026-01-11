@@ -168,7 +168,7 @@ namespace BLL.Services
 
                 _logger.Information("Course updated successfully: {CourseId}", courseId);
 
-                // ✅ FIXED: Invalidate both specific and all courses cache
+                // ✅ FIXED: Invalidate both specific and all courses cache separately
                 var cacheKey = string.Format(CACHE_KEY_ID, courseId);
                 await _cacheService.RemoveAsync(cacheKey);
                 await _cacheService.RemoveAsync(CACHE_KEY_ALL);
@@ -203,7 +203,7 @@ namespace BLL.Services
 
                 _logger.Information("Course deleted successfully: {CourseId}", courseId);
 
-                // ✅ FIXED: Invalidate both specific and all courses cache
+                // ✅ FIXED: Invalidate both specific and all courses cache separately
                 var cacheKey = string.Format(CACHE_KEY_ID, courseId);
                 await _cacheService.RemoveAsync(cacheKey);
                 await _cacheService.RemoveAsync(CACHE_KEY_ALL);

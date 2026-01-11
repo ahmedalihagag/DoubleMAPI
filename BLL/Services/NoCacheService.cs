@@ -6,7 +6,8 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 
 /// <summary>
-/// No-op cache service used when Redis is unavailable
+/// ✅ No-op cache service used when Redis is unavailable or disabled
+/// Implements the Null Object pattern to gracefully handle missing Redis
 /// </summary>
 public class NoCacheService : ICacheService
 {
@@ -15,10 +16,7 @@ public class NoCacheService : ICacheService
     public Task SetAsync<T>(string key, T value, TimeSpan? expiration = null) where T : class => Task.CompletedTask;
 
     public Task RemoveAsync(params string[] keys) => Task.CompletedTask;
-
     public Task RemoveAsync(string key) => Task.CompletedTask;
-
-    public Task ClearAsync() => Task.CompletedTask;
 
     public Task ClearAllAsync() => Task.CompletedTask;
 

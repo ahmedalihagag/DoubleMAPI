@@ -1,5 +1,8 @@
 namespace BLL.DTOs.CourseDTOs;
 
+/// <summary>
+/// ✅ Statistics for course enrollment and codes
+/// </summary>
 public class CourseEnrollmentStatsDto
 {
     public int CourseId { get; set; }

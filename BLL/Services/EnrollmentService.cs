@@ -119,6 +119,7 @@ namespace BLL.Services
 
         /// <summary>
         /// ✅ FIXED: Enroll student using CourseAccessCode (not CourseCode)
+        /// Uses 32-day expiration access codes for one-time enrollment
         /// </summary>
         public async Task<bool> EnrollStudentByCodeAsync(string studentId, string courseCode)
         {
@@ -128,7 +129,7 @@ namespace BLL.Services
             {
                 _logger.Information("Enrolling student {StudentId} using code: {Code}", studentId, courseCode);
 
-                // ✅ FIXED: Use CourseAccessCodes repository (correct one)
+                // ✅ FIXED: Use CourseAccessCodes repository (correct one for 32-day codes)
                 var now = DateTime.UtcNow;
                 var code = await _unitOfWork.CourseAccessCodes.FindAsync(c =>
                     c.Code == courseCode &&

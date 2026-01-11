@@ -4,6 +4,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using DAL.Enums;
 
 namespace DAL.Entities
 {
@@ -21,7 +22,7 @@ namespace DAL.Entities
         public string DeviceId { get; set; } = null!;
 
         [Required]
-        public Enum ClientType { get; set; } // 1=Web, 2=Android, 3=iOS
+        public ClientType ClientType { get; set; } // 1=Web, 2=Android, 3=iOS
 
         [MaxLength(200)]
         public string DeviceInfo { get; set; } = string.Empty;

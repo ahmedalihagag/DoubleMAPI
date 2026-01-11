@@ -1,4 +1,4 @@
-﻿using DAL.Entities;
+using DAL.Entities;
 using DAL.Fluent_API;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -72,13 +72,18 @@ namespace DAL.Data
             builder.ApplyConfiguration(new UserTokenConfiguration());
             builder.ApplyConfiguration(new DeviceSessionConfiguration());
 
+            // ✅ ADD THIS: Explicit enum conversion as fallback
+            builder.Entity<DeviceSession>()
+                .Property(d => d.ClientType)
+                .HasConversion<string>();
+
+
             // Rename Identity tables (optional)
             builder.Entity<ApplicationUser>().ToTable("Users");
             builder.Entity<Microsoft.AspNetCore.Identity.IdentityRole>().ToTable("Roles");
             builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserRole<string>>().ToTable("UserRoles");
             builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserClaim<string>>().ToTable("UserClaims");
             builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserLogin<string>>().ToTable("UserLogins");
-            builder.Entity<Microsoft.AspNetCore.Identity.IdentityUserToken<string>>().ToTable("UserTokens");
             builder.Entity<Microsoft.AspNetCore.Identity.IdentityRoleClaim<string>>().ToTable("RoleClaims");
         
             

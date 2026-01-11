@@ -1,4 +1,4 @@
-﻿using BLL.DTOs.SectionDTOs;
+using BLL.DTOs.SectionDTOs;
 using BLL.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -27,7 +27,7 @@ namespace DoubleMAPI.Controllers
         /// </summary>
         [HttpPost]
         [Authorize(Policy = "TeacherOrAdmin")]
-        public async Task<ActionResult<SectionDto>> CreateSection([FromBody] CreateSectionDto dto)
+        public async Task<ActionResult<SectionDto>> CreateSection(int courseId, [FromBody] CreateSectionDto dto)
         {
             if (!ModelState.IsValid)
                 return BadRequest(new { success = false, message = "Invalid input", errors = ModelState.Values });
@@ -37,17 +37,9 @@ namespace DoubleMAPI.Controllers
 
             try
             {
-                var sectionId = await _sectionService.CreateSectionAsync(dto);
-                var section = new SectionDto
-                {
-                    Id = sectionId,
-                    CourseId = dto.CourseId,
-                    Title = dto.Title,
-                    DisplayOrder = dto.DisplayOrder,
-                    CreatedAt = DateTime.UtcNow
-                };
+                var section = await _sectionService.CreateSectionAsync(dto);
 
-                return CreatedAtAction(nameof(GetSectionById), new { dto.CourseId, sectionId },
+                return CreatedAtAction(nameof(GetSectionById), new { courseId = section.CourseId, sectionId = section.Id },
                     new { success = true, data = section });
             }
             catch (Exception ex)
@@ -87,7 +79,7 @@ namespace DoubleMAPI.Controllers
             try
             {
                 var sections = await _sectionService.GetSectionsByCourseAsync(courseId);
-                return Ok(new { success = true, count = sections.Count, data = sections });
+                return Ok(new { success = true, count = sections.Count(), data = sections });
             }
             catch (Exception ex)
             {
@@ -108,7 +100,7 @@ namespace DoubleMAPI.Controllers
 
             try
             {
-                var success = await _sectionService.UpdateSectionAsync(sectionId, dto.Title, dto.DisplayOrder);
+                var success = await _sectionService.UpdateSectionAsync(sectionId, dto);
                 if (!success)
                     return NotFound(new { success = false, message = "Section not found" });
 

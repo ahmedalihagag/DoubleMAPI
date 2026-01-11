@@ -426,7 +426,7 @@ namespace BLL.Services
                 }
 
                 var session = await _deviceSessionService.GetActiveSessionAsync(
-                    storedToken.UserId,
+                    storedToken.UserId.ToString(),
                     dto.ClientType,
                     dto.DeviceId);
 
@@ -436,7 +436,7 @@ namespace BLL.Services
                     return new AuthResponseDto { IsSuccess = false, Message = "Device not registered" };
                 }
 
-                var user = await _unitOfWork.UserManager.FindByIdAsync(storedToken.UserId);
+                var user = await _unitOfWork.UserManager.FindByIdAsync(storedToken.UserId.ToString());
                 if (user == null)
                 {
                     _logger.Warning("User not found for biometric login");

@@ -61,7 +61,14 @@ namespace BLL.Services
                 _logger.Debug("Setting cache key: {Key}, Expiration: {Expiration}", key, expiration);
 
                 var serialized = JsonSerializer.Serialize(value);
-                await _database.StringSetAsync(key, serialized, expiration);
+                if (expiration.HasValue)
+                {
+                    await _database.StringSetAsync(key, serialized, new StackExchange.Redis.Expiration(expiration.Value));
+                }
+                else
+                {
+                    await _database.StringSetAsync(key, serialized);
+                }
 
                 _logger.Debug("Cache set successfully for key: {Key}", key);
             }

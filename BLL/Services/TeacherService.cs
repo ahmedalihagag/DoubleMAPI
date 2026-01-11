@@ -11,7 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 
 /// <summary>
-/// Service for managing teacher courses and enrollment codes
+/// ✅ Service for managing teacher courses and enrollment codes
 /// </summary>
 public class TeacherService : ITeacherService
 {

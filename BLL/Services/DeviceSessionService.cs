@@ -30,7 +30,7 @@ namespace BLL.Services
 
                 var sessions = await _unitOfWork.DeviceSessions.FindAsync(s =>
                     s.UserId == userId &&
-                    s.ClientType == clientType &&
+                    Equals(s.ClientType, clientType) &&
                     s.IsActive &&
                     s.ExpiresAt > DateTime.UtcNow);
 
@@ -57,12 +57,15 @@ namespace BLL.Services
             {
                 _logger.Information("Creating device session for user {UserId}, device {DeviceId}", userId, deviceId);
 
-                var existingSession = await _unitOfWork.DeviceSessions.FindAsync(s =>
+                var existingSessions = await _unitOfWork.DeviceSessions.FindAsync(s =>
                     s.UserId == userId &&
                     s.DeviceId == deviceId &&
-                    s.ClientType == clientType);
+                    Equals(s.ClientType, clientType));
 
                 DeviceSession session;
+
+                // Fix: Get the first matching session, or null if none found
+                var existingSession = existingSessions.FirstOrDefault();
 
                 if (existingSession != null)
                 {
@@ -108,9 +111,10 @@ namespace BLL.Services
             {
                 _logger.Information("Invalidating session for user {UserId}, device {DeviceId}", userId, deviceId);
 
-                var session = await _unitOfWork.DeviceSessions.FindAsync(s =>
+                var sessions = await _unitOfWork.DeviceSessions.FindAsync(s =>
                     s.UserId == userId && s.DeviceId == deviceId && s.IsActive);
 
+                var session = sessions.FirstOrDefault();
                 if (session == null)
                     return false;
 

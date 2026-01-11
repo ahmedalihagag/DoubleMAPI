@@ -43,33 +43,52 @@ try
     builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JwtSettings"));
     builder.Services.Configure<AdminUserSettings>(builder.Configuration.GetSection("AdminUser"));
 
+var emailSettings = builder.Configuration.GetSection("EmailSettings").Get<EmailSettings>();
+
+builder.Services
+    .AddFluentEmail(emailSettings?.SenderEmail ?? "noreply@doublem.com", emailSettings?.SenderName ?? "Double M Platform")
+    .AddSmtpSender("smtp.gmail.com", 587); // Configure your SMTP settings here
+
     // Database
     builder.Services.AddDbContext<ApplicationDbContext>(options =>
         options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-    // Redis Cache
-    var redisConnection = builder.Configuration.GetConnectionString("RedisConnection");
-    if (!string.IsNullOrWhiteSpace(redisConnection))
+// Redis Cache
+var redisConnection = builder.Configuration.GetConnectionString("RedisConnection");
+if (!string.IsNullOrWhiteSpace(redisConnection))
+{
+    try
     {
-        try
+        var options = ConfigurationOptions.Parse(redisConnection);
+        options.ConnectTimeout = 2000; // 2 seconds timeout
+        options.ConnectRetry = 2;
+        options.AbortOnConnectFail = false; // Important: don't abort if Redis is down
+        
+        var redis = await ConnectionMultiplexer.ConnectAsync(options);
+        
+        if (redis.IsConnected)
         {
-            var redis = ConnectionMultiplexer.Connect(redisConnection);
             builder.Services.AddSingleton<IConnectionMultiplexer>(redis);
             builder.Services.AddScoped<ICacheService, CacheService>();
             Log.Information("Redis cache configured successfully");
         }
-        catch (Exception ex)
+        else
         {
-            Log.Warning(ex, "Failed to connect to Redis. Caching will be disabled.");
+            Log.Warning("Redis connection failed. Caching will be disabled.");
             builder.Services.AddScoped<ICacheService, NoCacheService>();
         }
     }
-    else
+    catch (Exception ex)
     {
-        Log.Warning("Redis connection string not configured. Caching disabled.");
+        Log.Warning(ex, "Failed to connect to Redis. Caching will be disabled.");
         builder.Services.AddScoped<ICacheService, NoCacheService>();
     }
-
+}
+else
+{
+    Log.Information("No Redis connection string configured. Caching will be disabled.");
+    builder.Services.AddScoped<ICacheService, NoCacheService>();
+}
     // SignalR
     builder.Services.AddSignalR();
 
@@ -193,8 +212,8 @@ try
         {
             policy.AllowAnyOrigin()
                   .AllowAnyMethod()
-                  .AllowAnyHeader()
-                  .AllowCredentials();  // ✅ ADDED: Required for SignalR
+                  .AllowAnyHeader();
+                  //.AllowCredentials();  // ✅ ADDED: Required for SignalR
         });
     });
 

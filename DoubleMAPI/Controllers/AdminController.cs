@@ -19,7 +19,7 @@ namespace DoubleMAPI.Controllers
     {
         private readonly ICourseAccessCodeService _codeService;
         private readonly IDeviceSessionService _deviceSessionService;
-        private readonly ILogger _logger;
+        private readonly Serilog.ILogger _logger;
 
         public AdminController(ICourseAccessCodeService codeService, IDeviceSessionService deviceSessionService)
         {

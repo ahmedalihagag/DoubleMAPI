@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -15,6 +15,7 @@ namespace DAL.Entities
         public UserTokenType TokenType { get; set; }
         public DateTime Expiration { get; set; }
         public bool IsUsed { get; set; } = false;
+        public DateTime? UsedAt { get; set; } // Add this property to fix CS1061
     }
 
 }
